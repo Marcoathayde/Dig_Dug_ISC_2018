@@ -12,35 +12,49 @@
 .eqv INPUT_RDY_ADDR    0xFF200000	# Endereço com a informação sobre o estado do buffer de input. 1: pronto, 0: vazio
 .eqv INPUT_FINISH      0x030		# Caractere de finalização	
 
-.eqv TIME_STEP         0x032		# Intervalo entre atualizações, em milissegundos
+.eqv TIME_STEP         0x030		# Intervalo entre atualizações, em milissegundos
 
 .eqv DISPLAY_ADDR      0xFF000000	# Endereço do display
 
 .eqv DIGDUG_BS_SPEED   0x06		# Velocidade de Dig Dug
 
+# Limites
+
+.eqv WORLD_EDGE_X      3190		# Limites do mundo do jogo
+.eqv WORLD_EDGE_Y      2390
+
 .data
 
 # Estado do jogo
-GAME_SCORE: 	0x00000000
-GAME_HISCORE: 	0x00000000
-GAME_STAGE: 	0
+GAME_SCORE: 	.word 0x00000000
+GAME_HISCORE: 	.word 0x00000000
+GAME_STAGE: 	.byte 0
 
 
+#################################
+# Dados do Dig Dug (personagem) #
+#################################
 
-# Dados do Dig Dug (personagem).
-DIGDUG_LIVES: 5
+DIGDUG_LIVES: .byte 5
 
 # Coordenadas dos limites da box.
-DIGDUG_TOP_X: 255
-DIGDUG_TOP_Y: 255
-DIGDUG_BOT_X: 255
-DIGDUG_BOT_Y: 255
+DIGDUG_TOP_X: .word 0
+DIGDUG_TOP_Y: .word 0
+DIGDUG_BOT_X: .word 0
+DIGDUG_BOT_Y: .word 0
 
 # Velocidade, em pixels. Pode ter valores negativos.
-DIGDUG_SPEED_X: 0
-DIGDUG_SPEED_Y: 0
+DIGDUG_SPEED_X: .word 0
+DIGDUG_SPEED_Y: .word 0
 
-# Inimigos
+DIGDUG_TOP_X_P: .word 0
+DIGDUG_TOP_Y_P: .word 0
+DIGDUG_BOT_X_P: .word 0
+DIGDUG_BOT_Y_P: .word 0
+
+############
+# Inimigos #
+############
 
 # Pooka
 
@@ -264,7 +278,7 @@ END_DRAW:
 
 	li s6, 1 # Bool para MOVEMENT TEST
 	
-MAIN_LOOP: 
+MAIN: 
 	lw t0, INPUT_RDY_ADDR		# Vemos se há caractere a ler
 	beq t0, zero, GET_CURRENT_TIME  
 	lw t0, INPUT_DATA_ADDR   	# Termina o loop se recebermos o caractere desejado
@@ -307,6 +321,7 @@ DIGDUG_MOVE_UP:
 	li t1, 0xFFFFFFFF
 	li t2, DIGDUG_BS_SPEED
 	sub t1, t1, t2
+	addi t1, t1, 0x01
 	SET_VALUE_REG(DIGDUG_SPEED_Y, t1)
 	SET_VALUE_REG(DIGDUG_SPEED_X, zero)
 	j DIGDUG_CALC_NEXT_POS
@@ -322,6 +337,7 @@ DIGDUG_MOVE_LEFT:
 	li t1, 0xFFFFFFFF
 	li t2, DIGDUG_BS_SPEED
 	sub t1, t1, t2
+	addi t1, t1, 0x01
 	SET_VALUE_REG(DIGDUG_SPEED_X, t1)
 	SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
 	j DIGDUG_CALC_NEXT_POS
@@ -380,7 +396,7 @@ WAIT:
 	
 	WAIT(s0)
 	
-	j MAIN_LOOP
+	j MAIN
 
 END:	li a7, 10			# Termina o programa
 	ecall
