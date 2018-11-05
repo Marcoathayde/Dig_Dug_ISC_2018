@@ -10,11 +10,13 @@
 # Constantes globais
 .eqv INPUT_DATA_ADDR   0xFF200004	# Endereço onde é armazenado caracteres de entrada
 .eqv INPUT_RDY_ADDR    0xFF200000	# Endereço com a informação sobre o estado do buffer de input. 1: pronto, 0: vazio
-.eqv INPUT_FINISH      0x077		# Caractere de finalização	
+.eqv INPUT_FINISH      0x030		# Caractere de finalização	
 
 .eqv TIME_STEP         0x032		# Intervalo entre atualizações, em milissegundos
 
 .eqv DISPLAY_ADDR      0xFF000000	# Endereço do display
+
+.eqv DIGDUG_BS_SPEED   0x06		# Velocidade de Dig Dug
 
 .data
 
@@ -35,8 +37,8 @@ DIGDUG_BOT_X: 255
 DIGDUG_BOT_Y: 255
 
 # Velocidade, em pixels. Pode ter valores negativos.
-DIGDUG_SPEED_X: 2
-DIGDUG_SPEED_Y: 2
+DIGDUG_SPEED_X: 0
+DIGDUG_SPEED_Y: 0
 
 # Inimigos
 
@@ -64,6 +66,13 @@ FYGAR_TOP_Y: 255
 FYGAR_BOT_X: 255
 FYGAR_BOT_Y: 255
 
+
+# Dados de imagem
+
+SPRITE_SHEET_PATH: 	.asciz "digdug_sprtsheet.bin"
+SPRITE_SHEET_BUFFER: 	.space 42504
+BACKGROUND_PATH: 	.asciz "digdug_background.bin"
+BACKGROUND_BUFFER:      .space 76800
 
 .text
 
@@ -112,15 +121,15 @@ NORMAL_TIME_STEP:
 # %address: endereço da imagem; %offset: onde começar a ler; %width: largura da imagem; %cropw: largura do segmento; %croph: altura do segmento
 # %posx: coordenada X da tela; %posy: coordenada Y da tela
 .macro DRAW_IMG (%address, %offset, %width, %cropw, %croph, %posx, %posy)
-	la t0, %address			# Adicionamos ao endereço de início o offset desejado
+	la t0, %address					# Adicionamos ao endereço de início o offset desejado
 	li t1, %offset
 	add t0, t0, t1
 	
 	# Calculamos qual endereço onde começar a desenhar
-	li t3, %posy					# Primeiro pegamos a coordenada Y
+	mv t3, %posy					# Primeiro pegamos a coordenada Y
 	li t1, 320					# Multiplicamos pela largura do display para chegarmos na linha certa
 	mul t3, t3, t1			
-	addi t3, t3, %posx				# Adiciona-se o valor da cordenada X, para chegar na coluna certa
+	add t3, t3, %posx				# Adiciona-se o valor da cordenada X, para chegar na coluna certa
 	li t1, DISPLAY_ADDR				# A tudo isso, adicionamos o endereço onde começa o buffer de display
 	add t3, t3, t1
 	
@@ -181,15 +190,15 @@ END_DRAW:
 # %address: endereço da imagem; %offset: onde começar a ler; %width: largura da imagem; %cropw: largura do segmento; %croph: altura do segmento
 # %posx: coordenada X da tela; %posy: coordenada Y da tela
 .macro DRAW_IMG_TR (%address, %offset, %width, %cropw, %croph, %posx, %posy)
-	la t0, %address			# Adicionamos ao endereço de início o offset desejado
+	la t0, %address					# Adicionamos ao endereço de início o offset desejado
 	li t1, %offset
 	add t0, t0, t1
 	
 	# Calculamos qual endereço onde começar a desenhar
-	li t3, %posy					# Primeiro pegamos a coordenada Y
+	mv t3, %posy					# Primeiro pegamos a coordenada Y
 	li t1, 320					# Multiplicamos pela largura do display para chegarmos na linha certa
 	mul t3, t3, t1			
-	addi t3, t3, %posx				# Adiciona-se o valor da cordenada X, para chegar na coluna certa
+	add t3, t3, %posx				# Adiciona-se o valor da cordenada X, para chegar na coluna certa
 	li t1, DISPLAY_ADDR				# A tudo isso, adicionamos o endereço onde começa o buffer de display
 	add t3, t3, t1
 	
@@ -205,7 +214,6 @@ START_DRAW:
 	DRAW_PIXEL:			
 		beq t1, zero, END_DRAW_PIXEL		# Se o número de pixels na linha a desenhar for zero, saímos do loop interior
 		lb t4, (t0)				# Armazena a cor em t4 temporariamente
-
 		beq t4, zero, TEST_TRANSP		# Se a cor do pixel for preta, não desenhamos
 		sb t4, (t3)				# Desenhamos o pixel no buffer de display
 	TEST_TRANSP:
@@ -225,62 +233,136 @@ START_DRAW:
 	addi t2, t2, -1					# Uma linha a menos a desenhar
 	j START_DRAW
 END_DRAW:
-	
 .end_macro
-
 
 # Muda o valor de uma label - Sempre estar ciente do valor máximo que pode armazenar
-.macro SET_VALUE (%label, %value)
-	la t1, %label		# Armazena endereço da label em t5
-	li t2, %value		# Armazena valor em t6
-	sw t6, 0(t5)		# Muda o valor no endereço t5 para o valor t6
+.macro SET_VALUE_IMM (%label, %value)
+	la t0, %label		# Armazena endereço da label em t0
+	li t1, %value		# Armazena valor em t1
+	sw t1, 0(t0)		# Muda o valor no endereço t5 para o valor t6
 .end_macro
 
-.data
+# Muda o valor de uma label, usando um registrador - Sempre estar ciente do valor máximo que pode armazenar
+# Não usar registrador t0 como parâmetro dessa função
+.macro SET_VALUE_REG (%label, %reg)
+	la t0, %label		# Armazena endereço da label em t0
+	mv t1, %reg		# Armazena valor em t1
+	sw t1, 0(t0)		# Muda o valor no endereço t5 para o valor t6
+.end_macro
+######################################
+######################################
+#	 Começo do programa	     #
+######################################
+######################################
+	
+	# Carrega os arquivos de imagem
+	LOAD_DATA(BACKGROUND_PATH, BACKGROUND_BUFFER, 76800)
+	LOAD_DATA(SPRITE_SHEET_PATH, SPRITE_SHEET_BUFFER, 42504)
+	
+	# Depois mudar isto de posição
+	DRAW_IMG(BACKGROUND_BUFFER, 0, 320, 320, 240, x0, x0)
 
-# Arquivo de imagem para testes
-FILE_TEST: .asciz "digdug_sprtsheet.bin"
-
-IMG_TEST: .space 42504
-
-.text
-# Começo do programa
-	li s1, 1
+	li s6, 1 # Bool para MOVEMENT TEST
+	
 MAIN_LOOP: 
+	lw t0, INPUT_RDY_ADDR		# Vemos se há caractere a ler
+	beq t0, zero, GET_CURRENT_TIME  
 	lw t0, INPUT_DATA_ADDR   	# Termina o loop se recebermos o caractere desejado
 	li t1, INPUT_FINISH		# Caractere desejado
 	beq t0, t1, END			# Teste
+	mv s2, t0			# Colocamos o caractere em buffer para uso futuro
+	
+GET_CURRENT_TIME:
 	GET_TIME(s0) 			# Pegamos o tempo no começo do loop
 	
-	# Resto do jogo aqui
-	
-	# Teste de imagens
-	# Carregamos o arquivo com sprites
-LOAD_SPRITE_DT: beq s1, zero, SPRITE_DT_LOADED
-	
-	LOAD_DATA(FILE_TEST, IMG_TEST, 42504)
 
-	li s1, 0
-SPRITE_DT_LOADED:
+
+MOVEMENT_TEST_SETUP: beq s6, zero, MOVEMENT_TEST_SETUP_DONE
+	# Posição inicial
+	# Escala da representação virtual de espaço para pixels é 10:1
 	
-	# Desenhamos algumas segmentos - Referir-se à definição dessa função para detalhes
-	# Dig Dug olhando para a esquerda
-	DRAW_IMG(IMG_TEST, 4340, 154, 12, 13, 30, 30)
+	SET_VALUE_IMM(DIGDUG_TOP_X, 200)
+	SET_VALUE_IMM(DIGDUG_TOP_Y, 400)
+	SET_VALUE_IMM(DIGDUG_BOT_X, 390)
+	SET_VALUE_IMM(DIGDUG_BOT_Y, 590)
+	li s6, 0
+MOVEMENT_TEST_SETUP_DONE:
+
+	# trocar nome de DIGDUG_SPEEDX/Y para CURRENT_SPEED ou algo parecido
+	# Adicionar váriavel para armazenar direção, para decidir qual sprite usar
 	
-	# Pooka olhando para a direita
-	DRAW_IMG(IMG_TEST, 23281, 154, 12, 11, 100, 30)
-	DRAW_IMG(IMG_TEST, 23281, 154, 12, 11, 100, 60)
-	DRAW_IMG(IMG_TEST, 23281, 154, 12, 11, 120, 90)
-	DRAW_IMG_TR(IMG_TEST, 23281, 154, 12, 11, 140, 150)
+	mv t0, s2
+	li t1, 0x077			# substituir por eqv depois
+	beq t0, t1, DIGDUG_MOVE_UP
+	li t1, 0x061
+	beq t0, t1, DIGDUG_MOVE_LEFT
+	li t1, 0x073
+	beq t0, t1, DIGDUG_MOVE_DOWN
+	li t1, 0x64
+	beq t0, t1, DIGDUG_MOVE_RIGHT
+	j DIGDUG_CALC_NEXT_POS
 	
-	# Fygar olhando para a esquerda
-	DRAW_IMG(IMG_TEST, 14940, 154, 12, 12, 160, 160)
-	DRAW_IMG(IMG_TEST, 14940, 154, 12, 12, 160, 190)
-	DRAW_IMG(IMG_TEST, 14940, 154, 12, 12, 160, 220)
-	DRAW_IMG_TR(IMG_TEST, 14940, 154, 12, 12, 190, 160)
-	# Rocha
+DIGDUG_MOVE_UP:
+	# talvez colocar current speed in registradores, se for mais rápido e precisarmos da velocidade
+	li t1, 0xFFFFFFFF
+	li t2, DIGDUG_BS_SPEED
+	sub t1, t1, t2
+	SET_VALUE_REG(DIGDUG_SPEED_Y, t1)
+	SET_VALUE_REG(DIGDUG_SPEED_X, zero)
+	j DIGDUG_CALC_NEXT_POS
 	
+DIGDUG_MOVE_DOWN:
+	li t1, 3
+	li t1, DIGDUG_BS_SPEED
+	SET_VALUE_REG(DIGDUG_SPEED_Y, t1)
+	SET_VALUE_REG(DIGDUG_SPEED_X, zero)
+	j DIGDUG_CALC_NEXT_POS
+
+DIGDUG_MOVE_LEFT:
+	li t1, 0xFFFFFFFF
+	li t2, DIGDUG_BS_SPEED
+	sub t1, t1, t2
+	SET_VALUE_REG(DIGDUG_SPEED_X, t1)
+	SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
+	j DIGDUG_CALC_NEXT_POS
 	
+DIGDUG_MOVE_RIGHT:
+	li t1, 3
+	li t1, DIGDUG_BS_SPEED
+	SET_VALUE_REG(DIGDUG_SPEED_X, t1)
+	SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
+	j DIGDUG_CALC_NEXT_POS
+
+DIGDUG_CALC_NEXT_POS:
+
+	# Depois inserir teste de posição válida
+
+	lw t1, DIGDUG_TOP_X
+	lw t2, DIGDUG_SPEED_X
+	add t1, t1, t2
+	SET_VALUE_REG(DIGDUG_TOP_X, t1)
+	
+	lw t1, DIGDUG_TOP_Y
+	lw t2, DIGDUG_SPEED_Y
+	add t1, t1, t2
+	SET_VALUE_REG(DIGDUG_TOP_Y, t1)
+
+
+RENDER_OBJECTS:
+	
+	# Desenhando Dig Dug
+	# Trocar nomes para DIGDUG_CURRENT_TOP_*
+	# Antes disso desenhar background novo na posição anterior
+	# Usar um sprite branco e preto com operação lógica AND
+	
+	lw t5, DIGDUG_TOP_X
+	lw t6, DIGDUG_TOP_Y
+	li t2, 10
+	divu t5, t5, t2
+	divu t6, t6, t2
+	addi t6, t6, 8
+	
+	DRAW_IMG(SPRITE_SHEET_BUFFER, 4340, 154, 12, 13, t5, t6)
 	
 	
 WAIT:
