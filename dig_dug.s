@@ -13,15 +13,22 @@
 .eqv INPUT_FINISH      0x030		# Caractere de finalização	
 
 .eqv TIME_STEP         0x030		# Intervalo entre atualizações, em milissegundos
-
 .eqv DISPLAY_ADDR      0xFF000000	# Endereço do display
+.eqv DIGDUG_BS_SPEED   0x0F		# Velocidade de Dig Dug
+# Controles
+.eqv GAME_UP_KEY       0x077		# w
+.eqv GAME_DW_KEY       0x073		# s	
+.eqv GAME_LF_KEY       0x061		# a
+.eqv GAME_RT_KEY       0x064		# d
+.eqv GAME_AT_KEY       0x06C		# l
 
-.eqv DIGDUG_BS_SPEED   0x06		# Velocidade de Dig Dug
 
 # Limites
 
-.eqv WORLD_EDGE_X      3190		# Limites do mundo do jogo
-.eqv WORLD_EDGE_Y      2390
+.eqv WORLD_UP_EDGE_X   3000		# Limites do mundo do jogo
+.eqv WORLD_UP_EDGE_Y   2220
+.eqv WORLD_LW_EDGE_X   0
+.eqv WORLD_LW_EDGE_Y   200
 
 .data
 
@@ -29,13 +36,14 @@
 GAME_SCORE: 	.word 0x00000000
 GAME_HISCORE: 	.word 0x00000000
 GAME_STAGE: 	.byte 0
+GAME_LIVES:	.byte 5
 
 
 #################################
 # Dados do Dig Dug (personagem) #
 #################################
 
-DIGDUG_LIVES: .byte 5
+DIGDUG_DIRECTION: 	.word 0x0	# 0: cima; 1: baixo; 2: esquerda; 3: direita
 
 # Coordenadas dos limites da box.
 DIGDUG_TOP_X: .word 0
@@ -58,35 +66,44 @@ DIGDUG_BOT_Y_P: .word 0
 
 # Pooka
 
-POOKA_IN: 1
+POOKA_IN: .byte 1
 
-POOKA_SPEED_X: 2
-POOKA_SPEED_Y: 2
+POOKA_SPEED_X: .word 2
+POOKA_SPEED_Y: .word 2
 
-POOKA_TOP_X: 255
-POOKA_TOP_Y: 255
-POOKA_BOT_X: 255
-POOKA_BOT_Y: 255
+POOKA_TOP_X: .word 255
+POOKA_TOP_Y: .word 255
+POOKA_BOT_X: .word 255
+POOKA_BOT_Y: .word 255
 
 # Fygar
 
-FYGAR_IN: 1
+FYGAR_IN: .byte 1
 
-FYGAR_SPEED_X: 2
-FYGAR_SPEED_Y: 2
+FYGAR_SPEED_X: .word 2
+FYGAR_SPEED_Y: .word 2
 
-FYGAR_TOP_X: 255
-FYGAR_TOP_Y: 255
-FYGAR_BOT_X: 255
-FYGAR_BOT_Y: 255
+FYGAR_TOP_X: .word 255
+FYGAR_TOP_Y: .word 255
+FYGAR_BOT_X: .word 255
+FYGAR_BOT_Y: .word 255
 
 
 # Dados de imagem
-
 SPRITE_SHEET_PATH: 	.asciz "digdug_sprtsheet.bin"
 SPRITE_SHEET_BUFFER: 	.space 42504
 BACKGROUND_PATH: 	.asciz "digdug_background.bin"
 BACKGROUND_BUFFER:      .space 76800
+
+# Representação virtual dos túneis
+
+GAME_MAP: 		.space 76800
+LEVEL_1_PATH: 		.asciz "placeholder"
+LEVEL_2_PATH: 		.asciz "placeholder"
+LEVEL_3_PATH: 		.asciz "placeholder"
+LEVEL_4_PATH: 		.asciz "placeholder"
+LEVEL_5_PATH: 		.asciz "placeholder"
+
 
 .text
 
@@ -134,9 +151,9 @@ NORMAL_TIME_STEP:
 # largura do segmento PRECISA ser múltipla de 4
 # %address: endereço da imagem; %offset: onde começar a ler; %width: largura da imagem; %cropw: largura do segmento; %croph: altura do segmento
 # %posx: coordenada X da tela; %posy: coordenada Y da tela
-.macro DRAW_IMG (%address, %offset, %width, %cropw, %croph, %posx, %posy)
+.macro DRAW_IMG (%address, %width, %offset, %cropw, %croph, %posx, %posy)
 	la t0, %address					# Adicionamos ao endereço de início o offset desejado
-	li t1, %offset
+	mv t1, %offset
 	add t0, t0, t1
 	
 	# Calculamos qual endereço onde começar a desenhar
@@ -147,14 +164,14 @@ NORMAL_TIME_STEP:
 	li t1, DISPLAY_ADDR				# A tudo isso, adicionamos o endereço onde começa o buffer de display
 	add t3, t3, t1
 	
-	li t2, %croph
+	mv t2, %croph
 	# t0: endereço da imagem na memória
 	# t1: número de intervalos de 4 pixels, por linha, a desenhar
 	# t2: número de linhas a desenhar
 	# t3: endereço do buffer de display a desenhar
 START_DRAW:
 	beq t2, zero, END_DRAW				# Se o número de linhas a desenhar for zero, o loop acaba
-	li t1, %cropw
+	mv t1, %cropw
 	srli t1, t1, 2
 	DRAW_PIXEL:			
 		beq t1, zero, END_DRAW_PIXEL		# Se o número de pixels na linha a desenhar for zero, saímos do loop interior
@@ -188,7 +205,7 @@ START_DRAW:
 	END_DRAW_PIXEL:
 	# Terminamos de desenhar a linha, passamos para a próxima
 
-	li t5, %cropw					# Offset na imagem: (largura do arquivo) - (largura do segmento)
+	mv t5, %cropw					# Offset na imagem: (largura do arquivo) - (largura do segmento)
 	addi t0, t0, %width
 	sub t0, t0, t5
 	addi t3, t3, 320				# Offset no buffer: (largura do display) - (largura do segmento)
@@ -203,9 +220,9 @@ END_DRAW:
 # Desenha uma imagem armazenada em memória na tela, na posição especificada, com transparência (cor preta, ou rgb 0, 0, 0)
 # %address: endereço da imagem; %offset: onde começar a ler; %width: largura da imagem; %cropw: largura do segmento; %croph: altura do segmento
 # %posx: coordenada X da tela; %posy: coordenada Y da tela
-.macro DRAW_IMG_TR (%address, %offset, %width, %cropw, %croph, %posx, %posy)
+.macro DRAW_IMG_TR (%address, %width, %offset, %cropw, %croph, %posx, %posy)
 	la t0, %address					# Adicionamos ao endereço de início o offset desejado
-	li t1, %offset
+	mv t1, %offset
 	add t0, t0, t1
 	
 	# Calculamos qual endereço onde começar a desenhar
@@ -216,7 +233,7 @@ END_DRAW:
 	li t1, DISPLAY_ADDR				# A tudo isso, adicionamos o endereço onde começa o buffer de display
 	add t3, t3, t1
 	
-	li t2, %croph
+	mv t2, %croph
 	# t0: endereço da imagem na memória
 	# t1: número de pixels por linha a desenhar
 	# t2: número de linhas a desenhar
@@ -224,7 +241,7 @@ END_DRAW:
 	# Agora, leremos cada pixel individualmente, com a ajuda de dois loops, um interior ao outro
 START_DRAW:
 	beq t2, zero, END_DRAW				# Se o número de linhas a desenhar for zero, o loop acaba
-	li t1, %cropw
+	mv t1, %cropw
 	DRAW_PIXEL:			
 		beq t1, zero, END_DRAW_PIXEL		# Se o número de pixels na linha a desenhar for zero, saímos do loop interior
 		lb t4, (t0)				# Armazena a cor em t4 temporariamente
@@ -238,7 +255,7 @@ START_DRAW:
 	END_DRAW_PIXEL:
 	# Terminamos de desenhar a linha, passamos para a próxima
 
-	li t5, %cropw					# Offset na imagem: (largura do arquivo) - (largura do segmento)
+	mv t5, %cropw					# Offset na imagem: (largura do arquivo) - (largura do segmento)
 	addi t0, t0, %width
 	sub t0, t0, t5
 	addi t3, t3, 320				# Offset no buffer: (largura do display) - (largura do segmento)
@@ -273,8 +290,10 @@ END_DRAW:
 	LOAD_DATA(BACKGROUND_PATH, BACKGROUND_BUFFER, 76800)
 	LOAD_DATA(SPRITE_SHEET_PATH, SPRITE_SHEET_BUFFER, 42504)
 	
+	li a0, 320
+	li a1, 240
 	# Depois mudar isto de posição
-	DRAW_IMG(BACKGROUND_BUFFER, 0, 320, 320, 240, x0, x0)
+	DRAW_IMG(BACKGROUND_BUFFER, 320, zero, a0, a1, zero, zero)
 
 	li s6, 1 # Bool para MOVEMENT TEST
 	
@@ -306,62 +325,114 @@ MOVEMENT_TEST_SETUP_DONE:
 	# Adicionar váriavel para armazenar direção, para decidir qual sprite usar
 	
 	mv t0, s2
-	li t1, 0x077			# substituir por eqv depois
+	li t1, GAME_UP_KEY
 	beq t0, t1, DIGDUG_MOVE_UP
-	li t1, 0x061
+	li t1, GAME_LF_KEY
 	beq t0, t1, DIGDUG_MOVE_LEFT
-	li t1, 0x073
+	li t1, GAME_DW_KEY
 	beq t0, t1, DIGDUG_MOVE_DOWN
-	li t1, 0x64
+	li t1, GAME_RT_KEY
 	beq t0, t1, DIGDUG_MOVE_RIGHT
 	j DIGDUG_CALC_NEXT_POS
 	
 DIGDUG_MOVE_UP:
-	# talvez colocar current speed in registradores, se for mais rápido e precisarmos da velocidade
-	li t1, 0xFFFFFFFF
-	li t2, DIGDUG_BS_SPEED
-	sub t1, t1, t2
-	addi t1, t1, 0x01
-	SET_VALUE_REG(DIGDUG_SPEED_Y, t1)
-	SET_VALUE_REG(DIGDUG_SPEED_X, zero)
-	j DIGDUG_CALC_NEXT_POS
+	# Checamos se é uma posição válida para mudança de direção
+	lw t0, DIGDUG_DIRECTION
+	li t1, 1
+	ble t0, t1, DIGDUG_MOVE_UP_OK
+	lw t0, DIGDUG_TOP_X
+	lw t1, DIGDUG_TOP_Y
+	li t2, 200
+	li t3, 10
+	add t0, t0, t2
+	add t1, t1, t2
+	div t0, t0, t3
+	div t1, t1, t3
+	li t2, 20
+	rem t0, t0, t2
+	rem t1, t1, t2
+	bne t0, zero, DIGDUG_CALC_NEXT_POS
+	bne t1, zero, DIGDUG_CALC_NEXT_POS
 	
-DIGDUG_MOVE_DOWN:
-	li t1, 3
-	li t1, DIGDUG_BS_SPEED
-	SET_VALUE_REG(DIGDUG_SPEED_Y, t1)
+DIGDUG_MOVE_UP_OK:
+	li a0, 0xFFFFFFFF
+	li t0, DIGDUG_BS_SPEED
+	sub a0, a0, t0
+	addi a0, a0, 0x01
+	SET_VALUE_REG(DIGDUG_SPEED_Y, a0)
 	SET_VALUE_REG(DIGDUG_SPEED_X, zero)
+	SET_VALUE_IMM(DIGDUG_DIRECTION, 0)
+	j DIGDUG_CALC_NEXT_POS
+
+DIGDUG_MOVE_DOWN:
+	li a0, 3
+	li a0, DIGDUG_BS_SPEED
+	SET_VALUE_REG(DIGDUG_SPEED_Y, a0)
+	SET_VALUE_REG(DIGDUG_SPEED_X, zero)
+	SET_VALUE_IMM(DIGDUG_DIRECTION, 1)
 	j DIGDUG_CALC_NEXT_POS
 
 DIGDUG_MOVE_LEFT:
-	li t1, 0xFFFFFFFF
-	li t2, DIGDUG_BS_SPEED
-	sub t1, t1, t2
-	addi t1, t1, 0x01
-	SET_VALUE_REG(DIGDUG_SPEED_X, t1)
+	li a0, 0xFFFFFFFF
+	li t0, DIGDUG_BS_SPEED
+	sub a0, a0, t0
+	addi a0, a0, 0x01
+	SET_VALUE_REG(DIGDUG_SPEED_X, a0)
 	SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
+	SET_VALUE_IMM(DIGDUG_DIRECTION, 2)
 	j DIGDUG_CALC_NEXT_POS
 	
 DIGDUG_MOVE_RIGHT:
-	li t1, 3
-	li t1, DIGDUG_BS_SPEED
-	SET_VALUE_REG(DIGDUG_SPEED_X, t1)
+	li a0, 3
+	li a0, DIGDUG_BS_SPEED
+	SET_VALUE_REG(DIGDUG_SPEED_X, a0)
 	SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
+	SET_VALUE_IMM(DIGDUG_DIRECTION, 3)
 	j DIGDUG_CALC_NEXT_POS
 
 DIGDUG_CALC_NEXT_POS:
-
-	# Depois inserir teste de posição válida
-
-	lw t1, DIGDUG_TOP_X
-	lw t2, DIGDUG_SPEED_X
-	add t1, t1, t2
-	SET_VALUE_REG(DIGDUG_TOP_X, t1)
 	
-	lw t1, DIGDUG_TOP_Y
-	lw t2, DIGDUG_SPEED_Y
-	add t1, t1, t2
-	SET_VALUE_REG(DIGDUG_TOP_Y, t1)
+	# Guardamos a posição atual
+	lw a0, DIGDUG_TOP_X
+	SET_VALUE_REG(DIGDUG_TOP_X_P, a0)
+	lw a0, DIGDUG_TOP_Y
+	SET_VALUE_REG(DIGDUG_TOP_Y_P, a0)
+	lw a0, DIGDUG_BOT_X
+	SET_VALUE_REG(DIGDUG_BOT_X_P, a0)
+	lw a0, DIGDUG_BOT_Y
+	SET_VALUE_REG(DIGDUG_BOT_Y_P, a0)
+	
+	
+	lw a0, DIGDUG_TOP_X
+	lw t0, DIGDUG_SPEED_X
+	add a0, a0, t0
+	# Testa se o personagem está em posição válida, se não estiver, colocamos-o na borda
+	li t0, WORLD_UP_EDGE_X
+	blt a0, t0, DIGDUG_TEST_LOWER_X
+	mv a0, t0
+DIGDUG_TEST_LOWER_X:
+	li t0, WORLD_LW_EDGE_X
+	bge a0, t0, DIGDUG_SET_NEW_X
+	mv a0, t0
+DIGDUG_SET_NEW_X:
+	SET_VALUE_REG(DIGDUG_TOP_X, a0)
+
+
+	lw a0, DIGDUG_TOP_Y
+	lw t0, DIGDUG_SPEED_Y
+	add a0, a0, t0
+
+	li t0, WORLD_UP_EDGE_Y
+	blt a0, t0, DIGDUG_TEST_LOWER_Y
+	mv a0, t0
+DIGDUG_TEST_LOWER_Y:
+	li t0, WORLD_LW_EDGE_Y
+	bge a0, t0, DIGDUG_SET_NEW_Y
+	mv a0, t0
+DIGDUG_SET_NEW_Y:
+	SET_VALUE_REG(DIGDUG_TOP_Y, a0)
+	
+DIGDUG_CALC_NEXT_POS_END:
 
 
 RENDER_OBJECTS:
@@ -371,14 +442,19 @@ RENDER_OBJECTS:
 	# Antes disso desenhar background novo na posição anterior
 	# Usar um sprite branco e preto com operação lógica AND
 	
-	lw t5, DIGDUG_TOP_X
-	lw t6, DIGDUG_TOP_Y
-	li t2, 10
-	divu t5, t5, t2
-	divu t6, t6, t2
-	addi t6, t6, 8
+	lw a3, DIGDUG_TOP_X
+	lw a4, DIGDUG_TOP_Y
+	li t0, 10
+	div a3, a3, t0
+	div a4, a4, t0
+	addi a3, a3, 4
+	addi a4, a4, 4
 	
-	DRAW_IMG(SPRITE_SHEET_BUFFER, 4340, 154, 12, 13, t5, t6)
+	li a0, 4340
+	li a1, 12
+	li a2, 13
+	
+	DRAW_IMG(SPRITE_SHEET_BUFFER, 154, a0, a1, a2, a3, a4)
 	
 	
 WAIT:
@@ -386,10 +462,16 @@ WAIT:
 	GET_TIME(t1)			# Pegamos o tempo no final do loop, após todas as computações
 	addi s0, s0, TIME_STEP  	# Adicionamos o intervalo que queremos, para decidir o momento da próxima atualização
 	sub s0, s0, t1			# Subtraímos o tempo no final do loop do valor anterior para sabermos quanto tempo esperar
+
+	#mv a0, s0			# Printamos esse valor
+	#li a7, 1
+	#ecall
 	
-	mv a0, s0			# Printamos esse valor
+	lw a0, DIGDUG_TOP_X
 	li a7, 1
 	ecall
+	
+	
 	li a0, 10			# Printamos 'new line', para pular para a próxima linha no I/O
 	li a7, 11
 	ecall
