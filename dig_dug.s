@@ -22,6 +22,11 @@
 .eqv GAME_RT_KEY       0x064		# d
 .eqv GAME_ATK_KEY      0x06C		# l
 
+# Informação de buffer do jogo
+.eqv POOKA_SIZE        59		# Espaço em bytes ocupado por um Pooka - Sempre lembrar de atualizar após alterações
+.eqv POOKA_POS_OFFSET  29   
+.eqv FYGAR_SIZE        0
+.eqv ROCK_SIZE         0
 
 # Limites
 
@@ -79,15 +84,26 @@ DIGDUG_DW_DIG: .word 0
 
 # Pooka
 
-POOKA_IN: .byte 1
+POOKA_IN: 		.byte 1
+POOKA_DIRECTION: 	.word 0x00
+POOKA_CYCLE: 		.word 0x00
+POOKA_GHOST:		.byte 0x00
+POOKA_INFLATE:		.word 0x00
+POOKA_CRUSHED:		.byte 0x00
+POOKA_ROCK:		.word 0x00
 
-POOKA_SPEED_X: .word 2
-POOKA_SPEED_Y: .word 2
+POOKA_SPEED_X: 		.word 0
+POOKA_SPEED_Y: 		.word 0
 
-POOKA_TOP_X: .word 255
-POOKA_TOP_Y: .word 255
-POOKA_BOT_X: .word 255
-POOKA_BOT_Y: .word 255
+POOKA_TOP_X: 		.word 255
+POOKA_TOP_Y: 		.word 255
+POOKA_BOT_X: 		.word 255
+POOKA_BOT_Y: 		.word 255
+
+POOKA_TOP_X_P: 		.word 255
+POOKA_TOP_Y_P: 		.word 255
+POOKA_BOT_X_P: 		.word 255
+POOKA_BOT_Y_P: 		.word 255
 
 # Fygar
 
@@ -105,8 +121,15 @@ FYGAR_BOT_Y: .word 255
 # Dados de imagem
 SPRITE_SHEET_PATH: 	.asciz "bin/digdug_sprtsheet.bin"
 SPRITE_SHEET_BUFFER: 	.space 42504
-BACKGROUND_PATH: 	.asciz "bin/digdug_background.bin"
+DIGDUG_SPRT_SHEET_PATH: .asciz "bin/digdug_sprites.bin"
+DIGDUG_SPRT_SHEET:	.space 18000
+
+BACKGROUND_PATH: 	.asciz "bin/digdug_bg_01.bin"
+BACKGROUND_H_PATH:	.asciz "bin/digdug_bg_horizontal.bin"
+BACKGROUND_V_PATH:	.asciz "bin/digdug_bg_vertical.bin"
 BACKGROUND_BUFFER:      .space 76800
+BACKGROUND_H_BUFFER:	.space 76800
+BACKGROUND_V_BUFFER:	.space 76800
 TUNNEL_M_PATH:		.asciz "bin/tunnel_mask.bin"
 TUNNEL_MASK:		.space 400
 
@@ -122,9 +145,70 @@ LEVEL_4_PATH: 		.asciz "placeholder"
 LEVEL_5_PATH: 		.asciz "placeholder"
 
 
+# Buffer de objetos
+
+ALIGNMENT_BUFFER_00:	.space 1
+# Pooka(s) - Espaço para só um, por enquanto
+GAME_POOKA_COUNT:	.byte 0 		# Quantidade de pookas remanescentes
+GAME_POOKA_BUFFER: 	.space 59
+
 .text
 
 # Funções
+
+# Carrega um inimigo no jogo
+# No futuro, fazer isso um load enemy genérico
+# %template: label; %size: eqv; %enemy_buffer: label; %posoffset: eqv; %posx e %posy: registradores
+.macro LOAD_ENEMY (%template, %size, %enemy_buffer, %posoffset, %posx, %posy)
+	la t0, %enemy_buffer
+	# Adicionamos 1 para o contador de inimigos
+	lb t1, -1(t0)
+	addi t1, t1, 1
+	sb t1, -1(t0)
+	
+	# O teste presume que sempre haverá um espaço vazio, só precisa encontrá-lo
+	TEST_AVAILABILITY:
+		lb t1, (t0)
+		beq t1, zero, TEST_AVAILABILITY_END
+		addi t0, t0, %size
+		j TEST_AVAILABILITY
+	TEST_AVAILABILITY_END:
+	
+	# Copia o template para o espaço
+	
+	la t1, %template
+	li t2, %size
+	mv t4, t0					# Armazena o endereço do começo do espaço para depois
+	
+	LOAD_ENEMY_TO_BUFFER:
+		beq t2, zero, LOAD_ENEMY_END
+		lb t3, (t1)
+		sb t3, (t0)
+		addi t0, t0, 1
+		addi t1, t1, 1
+		addi t2, t2, -1
+		j LOAD_ENEMY_TO_BUFFER
+	LOAD_ENEMY_END:
+	
+	# Definir posição inicial
+	
+	li t3, %posoffset
+	add t0, t4, t3
+	mv t1, %posx
+	mv t2, %posy
+	
+	sw t1, (t0)
+	sw t2, 4(t0)
+	
+	addi t1, t1, 200
+	addi t2, t2, 200
+	addi t0, t0, 8
+	
+	sw t1, (t0)
+	sw t2, 4(t0)
+	
+.end_macro
+
 
 # Acha o tempo atual e armazena o valor no registrador %reg
 .macro GET_TIME (%reg)
@@ -189,23 +273,11 @@ NORMAL_TIME_STEP:
 START_DRAW:
 	beq t2, zero, END_DRAW				# Se o número de linhas a desenhar for zero, o loop acaba
 	mv t1, %cropw
-	srli t1, t1, 2
+	srli t1, t1, 1
 	DRAW_PIXEL:			
 		beq t1, zero, END_DRAW_PIXEL		# Se o número de pixels na linha a desenhar for zero, saímos do loop interior
 		
 		lb t4, (t0)				# Armazena a cor em t4 temporariamente
-		sb t4, (t3)				
-
-		addi t0, t0, 1				# Passa para o próximo pixel
-		addi t3, t3, 1
-		
-		lb t4, (t0)
-		sb t4, (t3)
-		
-		addi t0, t0, 1				# Passa para o próximo pixel
-		addi t3, t3, 1
-		
-		lb t4, (t0)			
 		sb t4, (t3)				
 
 		addi t0, t0, 1				# Passa para o próximo pixel
@@ -237,7 +309,7 @@ END_DRAW:
 # Similar ao DRAW_IMG, mas para a representação invisível do mapa de jogo.
 # %address: endereço de leitura; %offset: onde começar a ler; %width: largura da imagem; %cropw: largura do segmento; %croph: altura do segmento
 # %posx: coordenada X da tela; %posy: coordenada Y da tela
-.macro WRITE_TO_MAP (%address, %width, %offset, %cropw, %croph, %posx, %posy, %map_addr)
+.macro WRITE_TO_BUFFER (%address, %width, %offset, %cropw, %croph, %posx, %posy, %map_addr)
 	la t0, %address					# Adicionamos ao endereço de início o offset desejado
 	mv t1, %offset
 	add t0, t0, t1
@@ -342,6 +414,8 @@ END_DRAW:
 	mv t1, %reg		# Armazena valor em t1
 	sw t1, 0(t0)		# Muda o valor no endereço t5 para o valor t6
 .end_macro
+
+
 ######################################
 ######################################
 #	 Começo do programa	     #
@@ -352,17 +426,31 @@ END_DRAW:
 	
 	# Carrega os arquivos de imagem
 	LOAD_FILE(BACKGROUND_PATH, BACKGROUND_BUFFER, 76800)
+
+	LOAD_FILE(BACKGROUND_H_PATH, BACKGROUND_H_BUFFER, 76800)
+	LOAD_FILE(BACKGROUND_V_PATH, BACKGROUND_V_BUFFER, 76800)
+
 	LOAD_FILE(SPRITE_SHEET_PATH, SPRITE_SHEET_BUFFER, 42504)
+	LOAD_FILE(DIGDUG_SPRT_SHEET_PATH, DIGDUG_SPRT_SHEET, 18000)
+	# Imagem de lacuna na representação invisível
 	LOAD_FILE(GAP_DATA_PATH, GAP_DATA, 324)
+	# Imagem de lacuna na representação gráfica
 	LOAD_FILE(TUNNEL_M_PATH, TUNNEL_MASK, 400)
 
+	
+	# Setup de level
 	# Carrega mapa de jogo
 	LOAD_FILE(LEVEL_1_PATH, GAME_MAP, 76800)
 	
+	li a0, 200
+	li a1, 800
+	LOAD_ENEMY(POOKA_IN, POOKA_SIZE, GAME_POOKA_BUFFER, POOKA_POS_OFFSET, a0, a1)
+	
 	li a0, 320
 	li a1, 240
-	# Depois mudar isto de posição
 	DRAW_IMG(BACKGROUND_BUFFER, 320, zero, a0, a1, zero, zero)
+	
+	
 
 	li s6, 1 # Bool para MOVEMENT TEST - Remover depois
 	
@@ -389,10 +477,10 @@ MOVEMENT_TEST_SETUP: beq s6, zero, MOVEMENT_TEST_SETUP_DONE
 	# Posição inicial
 	# Escala da representação virtual de espaço para pixels é 10:1
 	
-	SET_VALUE_IMM(DIGDUG_TOP_X, 200)
-	SET_VALUE_IMM(DIGDUG_TOP_Y, 400)
-	SET_VALUE_IMM(DIGDUG_BOT_X, 390)
-	SET_VALUE_IMM(DIGDUG_BOT_Y, 590)
+	SET_VALUE_IMM(DIGDUG_TOP_X, 1400)
+	SET_VALUE_IMM(DIGDUG_TOP_Y, 1200)
+	SET_VALUE_IMM(DIGDUG_BOT_X, 1590)
+	SET_VALUE_IMM(DIGDUG_BOT_Y, 1390)
 	
 	lw t0, DIGDUG_TOP_X
 	li t6, 10
@@ -436,7 +524,7 @@ MOVEMENT_TEST_SETUP_DONE:
 MOVEMENT_PHASE:
 
 
-DIGDUG_MOVE:
+	DIGDUG_MOVE:
 	# Pegamos o input recebido, que está armazenado em s2, testamos para ver se é uma direção válida
 	
 	mv t0, s2
@@ -557,9 +645,9 @@ DIGDUG_MOVE:
 		SET_VALUE_IMM(DIGDUG_DIRECTION, 3)
 		j DIGDUG_CALC_NEXT_POS
 
-	DIGDUG_ATTACK:
+	DIGDUG_ATTACK: # Solta a mangueira, fica parado enquanto espera voltar
 
-DIGDUG_CALC_NEXT_POS:
+	DIGDUG_CALC_NEXT_POS:
 	
 		# Guardamos a posição atual
 		lw a0, DIGDUG_TOP_X
@@ -602,10 +690,18 @@ DIGDUG_CALC_NEXT_POS:
 	DIGDUG_SET_NEW_Y:
 		SET_VALUE_REG(DIGDUG_TOP_Y, a0)
 	
-DIGDUG_CALC_NEXT_POS_END:
+	DIGDUG_CALC_NEXT_POS_END:
 	
 		# Colocar checagem se está cavando ou não
 		# Para isso, testar TOP e BOT
+		
+	# Pooka
+	# Ao contrário de Dig Dug, Pooka colide com paredes
+	# Tem a mesma restrição de movimento na grade
+	
+	
+	
+	
 	
 UPDATE_GAME_MAP:
 
@@ -625,65 +721,105 @@ UPDATE_GAME_MAP:
 		li a3, 18
 		li a4, 18
 		la a5, GAME_MAP
-		WRITE_TO_MAP(GAP_DATA, 18, zero, a3, a4, a0, a1, a5)
+		WRITE_TO_BUFFER(GAP_DATA, 18, zero, a3, a4, a0, a1, a5)
 
 
 
-COLLISION_TEST:
+COLLISION_TEST: # Passar teste de colisão para depois da renderização
 
 
 RENDER_OBJECTS:
-#################################### ESTOU AQUI ########################################################@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-########################################################################################################@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 		# Usamos a booleana DIGDUG_DIGGING para determinar se irá cavar (substituir o background) ou não.
-
+		# Usa-se 2 camadas para representar as divisórias horizontais e verticais
+		# Se Dig Dug se mover horizontalmente, apaga as divisórias verticais, e vice-versa
 		lw t0, DIGDUG_DIGGING
 		beq t0, zero, REDRAW_BG
 		
+
+		lw t0, DIGDUG_DIRECTION
 		lw a0, DIGDUG_TOP_X
 		lw a1, DIGDUG_TOP_Y
 		
+		# Testamos a direção
+		beq t0, zero, DIGDUG_DIGGING_UP
+		li t1, 1
+		beq t0, t1, DIGDUG_DIGGING_DOWN
+		li t1, 2
+		beq t0, t1, DIGDUG_DIGGING_LEFT
+		
+		# t4: Buffer a ser apagado
+		
+	DIGDUG_DIGGING_RIGHT:
+		la t4, BACKGROUND_V_BUFFER
+		la t5, BACKGROUND_H_BUFFER
+		#addi a0, a0, 10
+		li t2, 20
+		li s11, 10
+		j DIGDUG_BG_REDRAW
+	DIGDUG_DIGGING_LEFT:
+		la t4, BACKGROUND_V_BUFFER
+		la t5, BACKGROUND_H_BUFFER
+		addi a0, a0, 10
+		li t2, 20
+		li s11, 10
+		j DIGDUG_BG_REDRAW
+	DIGDUG_DIGGING_UP:
+		la t4, BACKGROUND_H_BUFFER
+		la t5, BACKGROUND_V_BUFFER
+		li t2, 10
+		li s11, 20
+		j DIGDUG_BG_REDRAW
+	DIGDUG_DIGGING_DOWN:
+		la t4, BACKGROUND_H_BUFFER
+		la t5, BACKGROUND_V_BUFFER
+		li t2, 10
+		li s11, 20
+		addi a1, a1, 10
+		
+		
+	DIGDUG_BG_REDRAW:
+		# Cálculo de coordenadas no display
 		li t0, 10
 		div a0, a0, t0
 		div a1, a1, t0
-		
-		la t0, TUNNEL_MASK
-		
+		# Cálculo de offset
 		li t1, 320
 		mul a1, a1, t1			
 		add a3, a1, a0
 		li t3, DISPLAY_ADDR
-		add t3, a3, t3
-		li t2, 20
-		# t0: endereço da imagem na memória
-		# t1: número de pixels por linha a desenhar
-		# t2: número de linhas a desenhar
-		# t3: endereço do buffer de display a desenhar
-		# Agora, leremos cada pixel individualmente, com a ajuda de dois loops, um interior ao outro
-	DRAW_MASK:
-		beq t2, zero, DRAW_MASK_END				# Se o número de linhas a desenhar for zero, o loop acaba
-		li t1, 20
-		DRAW_MASK_INNER:
-			beq t1, zero, DRAW_MASK_INNER_END	
-			lb t4, (t0)				# Armazena a cor em t4 temporariamente
-			lb t5, (t3)
-			and t4, t4, t5
-			sb t4, (t3)				# Desenhamos o pixel no buffer de display
-			addi t0, t0, 1				# Passa para o próximo pixel
-			addi t3, t3, 1
-			addi t1, t1, -1				# Um pixel a menos a desenhar
-			j DRAW_MASK_INNER
-		DRAW_MASK_INNER_END:
+		add t3, t3, a3
+		add t4, t4, a3
+		add t5, t5, a3
 
-		addi t3, t3, 320				# Offset no buffer: (largura do display) - (largura do segmento)
-		li t5, 20
-		sub t3, t3, t5
-		addi t2, t2, -1					# Uma linha a menos a desenhar
-		j DRAW_MASK
-	DRAW_MASK_END:
+		# Em um loop só, apagamos e substituímos o background
+	DIGDUG_REPLACE_BG:
+		beq t2, zero, DIGDUG_REPLACE_BG_END
+		mv t1, s11
+		DIGDUG_REPLACE_BG_INNER:
+			beq t1, zero, DIGDUG_REPLACE_BG_INNER_END	
+			li t6, 0x0
+			sb t6, (t4)				
+			lb t0, (t5)
+			sb t0, (t3)	
+			addi t3, t3, 1
+			addi t4, t4, 1
+			addi t5, t5, 1
+			addi t1, t1, -1
+			j DIGDUG_REPLACE_BG_INNER
+		DIGDUG_REPLACE_BG_INNER_END:
+
+		addi t3, t3, 320
+		sub t3, t3, s11
+		addi t5, t5, 320
+		sub t5, t5, s11
+		addi t4, t4, 320
+		sub t4, t4, s11
+		addi t2, t2, -1
+		j DIGDUG_REPLACE_BG
+	DIGDUG_REPLACE_BG_END:
 	j DRAW_DIGDUG
+		
 	
 	REDRAW_BG:
 		# Redesenho de fundo
@@ -738,23 +874,52 @@ RENDER_OBJECTS:
 	
 	DRAW_DIGDUG:
 		# Desenhando Dig Dug
-		# Trocar nomes para DIGDUG_CURRENT_TOP_*
-		# Antes disso desenhar background novo na posição anterior
-		# Usar um sprite branco e preto com operação lógica AND
+		# Se não estiver cavando, usar transparência
 	
 		lw a3, DIGDUG_TOP_X
 		lw a4, DIGDUG_TOP_Y
 		li t0, 10
 		div a3, a3, t0
 		div a4, a4, t0
-		addi a3, a3, 4
-		addi a4, a4, 4
+		addi a3, a3, 1
+		addi a4, a4, 1
 	
-		li a0, 4340
-		li a1, 12
-		li a2, 13
+		li a0, 0
+		li a1, 18
+		li a2, 18
 	
-		DRAW_IMG(SPRITE_SHEET_BUFFER, 154, a0, a1, a2, a3, a4)
+		DRAW_IMG(DIGDUG_SPRT_SHEET, 36, a0, a1, a2, a3, a4)
+		
+	# Pookas(s)
+	
+	# Checa se há Pookas para desenhar
+	DRAW_POOKA:
+		lb t0, GAME_POOKA_COUNT
+		beq t0, zero, DRAW_POOKA_END
+		
+	# TO-DO - Fazer quatro checks em vez de um só com um loop
+	
+		la t0, GAME_POOKA_BUFFER
+		addi t0, t0, POOKA_POS_OFFSET
+		
+		lw a0, (t0)
+		lw a1, 4(t0)
+		li t1, 10
+		div a0, a0, t1
+		div a1, a1, t1
+		addi a0, a0, 5
+		addi a1, a1, 5
+		
+		li a2, 10937
+		li a3, 12
+		li a4, 12
+		
+		DRAW_IMG(SPRITE_SHEET_BUFFER, 154, a2, a3, a4, a0, a1)
+		
+		
+	DRAW_POOKA_END:
+	
+	
 	
 	
 WAIT:
@@ -767,7 +932,7 @@ WAIT:
 	li a7, 1
 	ecall
 	
-	#lw a0, DIGDUG_TOP_X
+	#mv a0, s5
 	#li a7, 1
 	#ecall
 	
@@ -775,7 +940,7 @@ WAIT:
 	#li a7, 11
 	#ecall
 	
-	#lw a0, DIGDUG_TOP_Y
+	#mv a0, s6
 	#li a7, 1
 	#ecall
 	
