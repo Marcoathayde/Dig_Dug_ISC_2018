@@ -34,4 +34,5 @@ DIGDUG_DW_DIG: .word 0
 
 DIGDUG_SPRT_SHEET_PATH: .asciz "bin/digdug_sprites.bin"
 DIGDUG_SPRT_SHEET:	.space 18000
+
 .text
