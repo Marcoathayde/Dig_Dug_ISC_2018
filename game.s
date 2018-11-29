@@ -315,6 +315,14 @@ UPDATE_GAME_MAP:
 		WRITE_TO_BUFFER(GAP_DATA, 18, zero, a3, a4, a0, a1, a5)
 
 
+	# Um loop que é aplicado a cada inimigo carregado em memória
+    ENEMY_PHASE:
+    	# WIP
+    	la	t0, CURRENT_ENEMY_ADDR
+    	la	t1, GAME_POOKA_BUFFER
+    	sw	t1, (t0)
+    	ENEMY_ACTION(CURRENT_ENEMY_ADDR)
+
 
 COLLISION_TEST: # Passar teste de colisão para depois da renderização
 
@@ -324,13 +332,12 @@ RENDER_OBJECTS:
 		# Usamos a booleana DIGDUG_DIGGING para determinar se irá cavar (substituir o background) ou não.
 		# Usa-se 2 camadas para representar as divisórias horizontais e verticais
 		# Se Dig Dug se mover horizontalmente, apaga as divisórias verticais, e vice-versa
-		lw t0, DIGDUG_DIGGING
+		loadw (t0, DIGDUG_DIGGING)
 		beq t0, zero, REDRAW_BG
 		
-
-		lw t0, DIGDUG_DIRECTION
-		lw a0, DIGDUG_TOP_X
-		lw a1, DIGDUG_TOP_Y
+		loadw (t0, DIGDUG_DIRECTION)
+		loadw (a0, DIGDUG_TOP_X)
+		loadw (a1, DIGDUG_TOP_Y)
 		
 		# Testamos a direção
 		beq t0, zero, DIGDUG_DIGGING_UP
@@ -367,7 +374,6 @@ RENDER_OBJECTS:
 		li t2, 10
 		li s11, 20
 		addi a1, a1, 10
-		
 		
 	DIGDUG_BG_REDRAW:
 		# Cálculo de coordenadas no display
@@ -414,8 +420,8 @@ RENDER_OBJECTS:
 	
 	REDRAW_BG:
 		# Redesenho de fundo
-		lw a3, DIGDUG_TOP_X_P
-		lw a4, DIGDUG_TOP_Y_P
+		loadw (a3, DIGDUG_TOP_X_P)
+		loadw (a4, DIGDUG_TOP_Y_P)
 		li t0, 10
 		div a3, a3, t0
 		div a4, a4, t0
@@ -427,11 +433,11 @@ RENDER_OBJECTS:
 		#########################################
 		DRAW_IMG(DIGDUG_BG_DATA, 20, zero, a0, a1, a3, a4)
 	
-		lw t0, DIGDUG_TOP_X
+		loadw (t0, DIGDUG_TOP_X)
 		li t6, 10
 		div t0, t0, t6
 	
-		lw t1, DIGDUG_TOP_Y
+		loadw (t1, DIGDUG_TOP_Y)
 		div t1, t1, t6
 	
 		li t3, 320
@@ -467,8 +473,8 @@ RENDER_OBJECTS:
 		# Desenhando Dig Dug
 		# Se não estiver cavando, usar transparência
 	
-		lw a3, DIGDUG_TOP_X
-		lw a4, DIGDUG_TOP_Y
+		loadw(a3, DIGDUG_TOP_X)
+		loadw(a4, DIGDUG_TOP_Y)
 		li t0, 10
 		div a3, a3, t0
 		div a4, a4, t0
@@ -485,7 +491,7 @@ RENDER_OBJECTS:
 	
 	# Checa se há Pookas para desenhar
 	DRAW_POOKA:
-		lb t0, GAME_POOKA_COUNT
+		loadw(t0, GAME_POOKA_COUNT)
 		beq t0, zero, DRAW_POOKA_END
 		
 	# TO-DO - Fazer quatro checks em vez de um só com um loop
@@ -509,8 +515,6 @@ RENDER_OBJECTS:
 		
 		
 	DRAW_POOKA_END:
-	
-	
 	
 	
 WAIT:
@@ -547,21 +551,17 @@ WAIT:
 	NORMAL_TIME_STEP:
 	li a7, 32
 	ecall
-	
-	j MAIN
+
+	jump (t0, MAIN)
 	
 	
 LEVEL_SELECT: 
-	lw	t0, LEVEL_COUNTER
 	
-
 END:	
 	# DEBUG, remover depois
 	li a0, 320
 	li a1, 240
 	DRAW_IMG(GAME_MAP, 320, zero, a0, a1, zero, zero)
-	
-	
 	
 
 .end_macro

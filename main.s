@@ -76,31 +76,31 @@ MAIN:	# Desenha imagem atual do menu na tela, só uma vez
 		li	t0, INPUT_INSTRUCT
 		beq	s1, t0, INSTRUCTIONS
 		
-		j WAIT
+		jump (t1, WAIT)	
 	
 	
 	
 	PLAY_GAME: 	mv s1, zero					# Resetamos o registrador com o input
-		
+	
 		GAME()
-		j MAIN
+		jump (t0, MAIN)
 		
 	INSTRUCTIONS: 	mv s1, zero
 	
 		LOAD_FILE(INSTRUCTIONS_PATH, MENU_IMG_BUFFER, 76800)
 		la 	s3, INSTRUCTIONS_SCREEN_INPUT
-		j MAIN
+		jump (t0, MAIN)
 		
 		INSTRUCTIONS_SCREEN_INPUT:
 			li	t0, INPUT_BACK_TITLE
 			beq	s1, t0, BACK_TO_TITLE
 			
-			j WAIT
+			jump (t1, WAIT)
 	
 	
 	BACK_TO_TITLE:	la s3, TITLE_SCREEN_INPUT
 		LOAD_FILE(TITLE_SCREEN_PATH, MENU_IMG_BUFFER, 76800)
-		j MAIN
+		jump (t0, MAIN)
 	
 	
 	# Calcula quanto tempo esperar até a próxima atualização, printa esse tempo
@@ -130,7 +130,7 @@ MAIN:	# Desenha imagem atual do menu na tela, só uma vez
 		ecall
 	
 		WAIT(s0)
-		j MENU_INPUT
+		jump(t0, MENU_INPUT)
 
 
 END:	li 	a7, 10

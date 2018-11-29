@@ -36,19 +36,18 @@ GAME_LIVES:	.byte 5
 SPRITE_SHEET_PATH: 	.asciz "bin/digdug_sprtsheet.bin"
 SPRITE_SHEET_BUFFER: 	.space 42504
 
-# Buffer de objetos
-CURRENT_ENEMY_ADDR:	.word 0x00
-
-
-#ALIGNMENT_BUFFER_00:	.space 2
-# Pooka(s) - Espaço para só um, por enquanto
-.align 2
-GAME_POOKA_COUNT:	.word 0 		# Quantidade de pookas remanescentes
-GAME_POOKA_BUFFER: 	.space 64
-
 .text
-
 # Funções
+# Usa um registrador para fazer um pulo sem restrições
+.macro jump (%reg, %label)
+	la	%reg, %label
+	jalr	zero, %reg, 0
+.end_macro
+# Usa um registrador para carregar dado armazenado no endereço da label, sem restrições
+.macro loadw (%reg, %label)
+	la	%reg, %label
+	lw	%reg, (%reg)
+.end_macro
 
 # Acha o tempo atual e armazena o valor no registrador %reg
 .macro GET_TIME (%reg)
