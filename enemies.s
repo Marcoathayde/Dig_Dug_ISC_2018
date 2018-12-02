@@ -158,9 +158,9 @@ GAME_POOKA_BUFFER: 	.space 72
 		
 			mv 	t0, %topx
 			div 	t0, t0, t6
+			addi	t0, t0, 1
 		
 			mv 	t1, %topy
-			addi	t1, t1, -10
 			div	t1, t1, t6
 			
 			li 	t5, 1
@@ -170,9 +170,10 @@ GAME_POOKA_BUFFER: 	.space 72
 	
 			mv 	t0, %topx
 			div	t0, t0, t6
+			addi	t0, t0, 1
 			
 			mv	t1, %topy
-			addi	t1, t1, 200			# Possível problema aqui
+			addi	t1, t1, 190			# Possível problema aqui
 			div	t1, t1, t6
 			
 			li	t5, 1
@@ -181,11 +182,11 @@ GAME_POOKA_BUFFER: 	.space 72
 	DIR_LEFT:	li	t6, 10
 	
 			mv 	t0, %topx
-			addi	t1, t1, -10
 			div	t0, t0, t6
 		
 			mv	t1, %topy
 			div	t1, t1, t6
+			addi	t1, t1, 1
 			
 			li	t5, 320
 			j FIND_OFFSET
@@ -193,11 +194,12 @@ GAME_POOKA_BUFFER: 	.space 72
 	DIR_RIGHT:	li	t6, 10
 	
 			mv	t0, %topx
-			addi	t1, t1, 200
+			addi	t0, t0, 190
 			div	t0, t0, t6
 			
 			mv	t1, %topy
 			div	t1, t1, t6
+			addi	t1, t1, 1
 			
 			li	t5, 320
 			
@@ -208,7 +210,7 @@ GAME_POOKA_BUFFER: 	.space 72
 			la 	t6, GAME_MAP
 			add	t6, t0, t6
 	
-			li	t0, 20				# Se encontrar problemas de desempenho, tentar mudar teste de byte para word
+			li	t0, 18				# Se encontrar problemas de desempenho, tentar mudar teste de byte para word
 	TEST:  		beq 	t0, zero, NO_COLL
 			lb	t1, (t6)
 			bne 	t1, zero, COLL_DETECT
@@ -322,8 +324,9 @@ GAME_POOKA_BUFFER: 	.space 72
     CHOOSE_DIR:
 		# Se não houver caminhos disponíveis, testamos a direção atual somente
 	beq	s11, zero, TEST_CUR_DIR
-		
-	la	t0, GAME_ENEMY_COUNT
+	
+	# Descomentar as próximas três linhas faz com que o inimigo fuja se for o último	
+	loadw(	t0, GAME_ENEMY_COUNT)
 	li	t1, 1
 	beq	t0, t1, LAST_ENEMY
 	# Não é o último inimigo, então checamos se está alinhado com Dig Dug
@@ -416,16 +419,18 @@ GAME_POOKA_BUFFER: 	.space 72
 	sw	s10, (t2)
 	addi	s11, s11, 1
 	TEST_OPP_DIR:
-		neg 	s10, s10
+		loadw(	t0, %enemy_addr)
+		addi	t0, t0, ENEMY_POS_OFFSET
 		lw	a0, (t0)
 		lw	a1, 4(t0)
+		neg 	s10, s10
 		ENEMY_WALL_COLL(a0, a1, s10)
 		bne 	a0, zero, PICK_RNDM_DIR
 		
-		la	t1, ENEMY_AVAIL_DIR
+		la	t2, ENEMY_AVAIL_DIR
 		li	t1, 4
 		mul	t1, s11, t1
-		add	t1, t2, t1
+		add	t2, t2, t1
 		sw	s10, (t2)
 		addi	s11, s11, 1
 		

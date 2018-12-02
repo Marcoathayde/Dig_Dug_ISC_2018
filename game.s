@@ -241,13 +241,13 @@ MOVEMENT_PHASE:
 	DIGDUG_CALC_NEXT_POS:
 	
 		# Guardamos a posição atual
-		lw a0, DIGDUG_TOP_X
+		loadw( 	a0, DIGDUG_TOP_X)
 		SET_VALUE_REG(DIGDUG_TOP_X_P, a0)
-		lw a0, DIGDUG_TOP_Y
+		loadw(	a0, DIGDUG_TOP_Y)
 		SET_VALUE_REG(DIGDUG_TOP_Y_P, a0)
-		lw a0, DIGDUG_BOT_X
+		loadw( 	a0, DIGDUG_BOT_X)
 		SET_VALUE_REG(DIGDUG_BOT_X_P, a0)
-		lw a0, DIGDUG_BOT_Y
+		loadw( 	a0, DIGDUG_BOT_Y)
 		SET_VALUE_REG(DIGDUG_BOT_Y_P, a0)
 	
 		# Checa se Dig Dug não saiu da borda do jogo. Testamos X e Y.
@@ -473,17 +473,17 @@ RENDER_OBJECTS:
 		# Desenhando Dig Dug
 		# Se não estiver cavando, usar transparência
 	
-		loadw(a3, DIGDUG_TOP_X)
-		loadw(a4, DIGDUG_TOP_Y)
-		li t0, 10
-		div a3, a3, t0
-		div a4, a4, t0
-		addi a3, a3, 1
-		addi a4, a4, 1
+		loadw(	a3, DIGDUG_TOP_X)
+		loadw(	a4, DIGDUG_TOP_Y)
+		li 	t0, 10
+		div 	a3, a3, t0
+		div 	a4, a4, t0
+		addi 	a3, a3, 1
+		addi 	a4, a4, 1
 	
-		li a0, 0
-		li a1, 18
-		li a2, 18
+		li 	a0, 0
+		li 	a1, 18
+		li 	a2, 18
 	
 		DRAW_IMG_TR(DIGDUG_SPRT_SHEET, 36, a0, a1, a2, a3, a4)
 		
@@ -526,20 +526,6 @@ WAIT:
 	mv a0, s0			# Printamos esse valor
 	li a7, 1
 	ecall
-	
-	#mv a0, s5
-	#li a7, 1
-	#ecall
-	
-	#li a0, 0x020
-	#li a7, 11
-	#ecall
-	
-	#mv a0, s6
-	#li a7, 1
-	#ecall
-	
-	
 	li a0, 10			# Printamos 'new line', para pular para a próxima linha no I/O
 	li a7, 11
 	ecall

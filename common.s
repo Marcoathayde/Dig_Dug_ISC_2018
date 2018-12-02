@@ -293,3 +293,62 @@ END_DRAW:
     NOT_ALIGNED: li a0, 0
     END:
 .end_macro
+
+# Usa os 3 buffers de gráficos para redesenhar BG na posição anterior de um objeto, de forma a "apagá-lo"
+# Usa t0, t1, t2, t3, t4, t5, t6, s10
+.macro REDRAW_BG (%topx, %topy, %width, %height)
+
+	# Calcula offset e soma ao endereço do display, armazena em t0 - Não alterar t0
+	mv	t0, %topy
+	mv	t1, %topx
+	li	t2, 320
+	li	t3, DISPLAY_ADDR
+	mul	t0, t0, t2
+	add	t0, t0, t1
+	add	t0, t0, t3
+	
+	mv	t1, %height
+	
+	la	t4, BG_HLAYER_BUFFER
+	la	t5, BG_VLAYER_BUFFER
+	la	t6, BG_DLAYER_BUFFER
+
+    OUTER_LOOP:
+    	beq 	t1, zero, END_OUTER
+    	mv	t2, %width
+    		INNER_LOOP:
+    			beq	t2, zero, END_INNER
+    			
+    			sb	zero, (t0)
+    			
+    			lb	s10, (t4)
+    			sb	s10, (t0)
+    			
+    			lb	s10, (t5)
+    			sb	s10, (t0)
+    			
+    			lb	s10, (t6)
+    			sb	s10, (t0)
+    			
+    			addi	t0, t0, 1
+    			addi	t4, t4, 1
+    			addi	t5, t5, 1
+    			addi	t6, t6, 1
+    			
+    			addi	t2, t2, -1
+    			j INNER_LOOP
+    		END_INNER:
+    	addi	t0, t0, 320
+    	addi	t4, t4, 320
+    	addi	t5, t5, 320
+    	addi	t6, t6, 320
+    	
+    	sub	t0, t0, %width
+    	sub	t4, t4, %width
+    	sub	t5, t5, %width
+    	sub	t6, t6, %width
+    	
+    	addi	t1, t1, -1
+    	j OUTER_LOOP
+    END_OUTER:
+.end_macro
