@@ -19,7 +19,6 @@ LEVEL_0_VLAYER:		.asciz "bin/level_0/00_bg_vlayer.bin"
 # Level 05
 
 # Buffers de gráfico
-BG_BLAYER_BUFFER:	.space 76800
 BG_DLAYER_BUFFER:       .space 76800
 BG_HLAYER_BUFFER:	.space 76800
 BG_VLAYER_BUFFER:	.space 76800
@@ -301,18 +300,8 @@ UPDATE_GAME_MAP:
 		# Como a rocha caindo também pode alterar a configuração do mapa, ela também aparece aqui
 	
 		# Dig Dug
+		DIGDUG_DIGS()
 		
-		lw a0, DIGDUG_TOP_X
-		lw a1, DIGDUG_TOP_Y
-		li t0, 10
-		div a0, a0, t0
-		div a1, a1, t0
-		addi a0, a0, 1
-		addi a1, a1, 1
-		li a3, 18
-		li a4, 18
-		la a5, GAME_MAP
-		WRITE_TO_BUFFER(GAP_DATA, 18, zero, a3, a4, a0, a1, a5)
 
 
 	# Um loop que é aplicado a cada inimigo carregado em memória
@@ -332,141 +321,13 @@ RENDER_OBJECTS:
 		# Usamos a booleana DIGDUG_DIGGING para determinar se irá cavar (substituir o background) ou não.
 		# Usa-se 2 camadas para representar as divisórias horizontais e verticais
 		# Se Dig Dug se mover horizontalmente, apaga as divisórias verticais, e vice-versa
-		loadw (t0, DIGDUG_DIGGING)
-		beq t0, zero, REDRAW_BG
 		
-		loadw (t0, DIGDUG_DIRECTION)
-		loadw (a0, DIGDUG_TOP_X)
-		loadw (a1, DIGDUG_TOP_Y)
+		loadw(	a0, DIGDUG_TOP_X_P)
+		loadw(	a1, DIGDUG_TOP_Y_P)
+		li	a2, 20
+		li	a3, 20
 		
-		# Testamos a direção
-		beq t0, zero, DIGDUG_DIGGING_UP
-		li t1, 1
-		beq t0, t1, DIGDUG_DIGGING_DOWN
-		li t1, 2
-		beq t0, t1, DIGDUG_DIGGING_LEFT
-		
-		# t4: Buffer a ser apagado
-		
-	DIGDUG_DIGGING_RIGHT:
-		la t4, BG_VLAYER_BUFFER
-		la t5, BG_HLAYER_BUFFER
-		#addi a0, a0, 10
-		li t2, 20
-		li s11, 10
-		j DIGDUG_BG_REDRAW
-	DIGDUG_DIGGING_LEFT:
-		la t4, BG_VLAYER_BUFFER
-		la t5, BG_HLAYER_BUFFER
-		addi a0, a0, 10
-		li t2, 20
-		li s11, 10
-		j DIGDUG_BG_REDRAW
-	DIGDUG_DIGGING_UP:
-		la t4, BG_HLAYER_BUFFER
-		la t5, BG_VLAYER_BUFFER
-		li t2, 10
-		li s11, 20
-		j DIGDUG_BG_REDRAW
-	DIGDUG_DIGGING_DOWN:
-		la t4, BG_HLAYER_BUFFER
-		la t5, BG_VLAYER_BUFFER
-		li t2, 10
-		li s11, 20
-		addi a1, a1, 10
-		
-	DIGDUG_BG_REDRAW:
-		# Cálculo de coordenadas no display
-		li t0, 10
-		div a0, a0, t0
-		div a1, a1, t0
-		# Cálculo de offset
-		li t1, 320
-		mul a1, a1, t1			
-		add a3, a1, a0
-		li t3, DISPLAY_ADDR
-		add t3, t3, a3
-		add t4, t4, a3
-		add t5, t5, a3
-
-		# Em um loop só, apagamos e substituímos o background
-	DIGDUG_REPLACE_BG:
-		beq t2, zero, DIGDUG_REPLACE_BG_END
-		mv t1, s11
-		DIGDUG_REPLACE_BG_INNER:
-			beq t1, zero, DIGDUG_REPLACE_BG_INNER_END	
-			li t6, 0x0
-			sb t6, (t4)				
-			lb t0, (t5)
-			sb t0, (t3)	
-			addi t3, t3, 1
-			addi t4, t4, 1
-			addi t5, t5, 1
-			addi t1, t1, -1
-			j DIGDUG_REPLACE_BG_INNER
-		DIGDUG_REPLACE_BG_INNER_END:
-
-		addi t3, t3, 320
-		sub t3, t3, s11
-		addi t5, t5, 320
-		sub t5, t5, s11
-		addi t4, t4, 320
-		sub t4, t4, s11
-		addi t2, t2, -1
-		j DIGDUG_REPLACE_BG
-	DIGDUG_REPLACE_BG_END:
-	j DRAW_DIGDUG
-		
-	
-	REDRAW_BG:
-		# Redesenho de fundo
-		loadw (a3, DIGDUG_TOP_X_P)
-		loadw (a4, DIGDUG_TOP_Y_P)
-		li t0, 10
-		div a3, a3, t0
-		div a4, a4, t0
-	
-		li a0, 20
-		li a1, 20
-		#########################################
-		# Otimizar não usando DIGDUG_BG_DATA ###
-		#########################################
-		DRAW_IMG(DIGDUG_BG_DATA, 20, zero, a0, a1, a3, a4)
-	
-		loadw (t0, DIGDUG_TOP_X)
-		li t6, 10
-		div t0, t0, t6
-	
-		loadw (t1, DIGDUG_TOP_Y)
-		div t1, t1, t6
-	
-		li t3, 320
-		mul t1, t1, t3
-		add t0, t1, t0
-		la t5, BG_DLAYER_BUFFER
-		add t0, t0, t5
-		la t2, DIGDUG_BG_DATA
-		li t3, 20
-		li t5, 20
-	
-	SAVE_BG_DATA_OUTER:
-		beq t5, zero, SAVE_BG_DATA_DONE
-		li t3, 20
-		SAVE_BG_DATA_INNER:
-			beq t3, zero, SAVE_BG_DATA_INNER_DONE
-			# 4 por vez
-			lb t4, (t0)
-			sb t4, (t2)
-			addi t0, t0, 1
-			addi t2, t2, 1
-	
-			addi t3, t3, -1
-			j SAVE_BG_DATA_INNER
-		SAVE_BG_DATA_INNER_DONE:
-		addi t0, t0, 300
-		addi t5, t5, -1
-		j SAVE_BG_DATA_OUTER
-	SAVE_BG_DATA_DONE:
+		REDRAW_BG(a0, a1, a2, a3)
 	
 	
 	DRAW_DIGDUG:
@@ -494,8 +355,20 @@ RENDER_OBJECTS:
 		loadw(t0, GAME_POOKA_COUNT)
 		beq t0, zero, DRAW_POOKA_END
 		
+		
+		
 	# TO-DO - Fazer quatro checks em vez de um só com um loop
 	
+		la t0, GAME_POOKA_BUFFER
+		addi t0, t0, ENEMY_POS_OFFSET
+		
+		# Redesenhamos o BG primeiro
+		lw	a0, 16(t0)
+		lw	a1, 20(t0)
+		li	a2, 20
+		li	a3, 20
+		REDRAW_BG(a0, a1, a2, a3)
+		
 		la t0, GAME_POOKA_BUFFER
 		addi t0, t0, ENEMY_POS_OFFSET
 		
@@ -523,9 +396,11 @@ WAIT:
 	addi s0, s0, TIME_STEP  	# Adicionamos o intervalo que queremos, para decidir o momento da próxima atualização
 	sub s0, s0, t1			# Subtraímos o tempo no final do loop do valor anterior para sabermos quanto tempo esperar
 
+	
 	mv a0, s0			# Printamos esse valor
 	li a7, 1
 	ecall
+	
 	li a0, 10			# Printamos 'new line', para pular para a próxima linha no I/O
 	li a7, 11
 	ecall

@@ -44,8 +44,8 @@ DIGDUG_SPRT_SHEET:	.space 18000
 
 	# Apaga seção do mapa de jogo
 
-	loadw(	a0, DIGDUG_TOP_Y)
-	loadw(	a1, DIGDUG_TOP_X)
+	loadw(	a0, DIGDUG_TOP_X)
+	loadw(	a1, DIGDUG_TOP_Y)
 
 	li 	t0, 10
 	div 	a0, a0, t0
@@ -87,7 +87,7 @@ DIGDUG_SPRT_SHEET:	.space 18000
     	j OFFSET
     	
     DIG_DOWN:
-    	addi	t0, t0, 100
+    	addi	t1, t1, 100
     	li	t2, 10
     	li	s10, 20
     	la	a0, BG_HLAYER_BUFFER
@@ -117,7 +117,7 @@ DIGDUG_SPRT_SHEET:	.space 18000
     		INNER:
     			beq	t3, zero, END_INNER
     			
-    			li	t4, TRANSPARENT
+    			li	t4, TRANSP
     			sb	t4, (a0)
     			sb	t4, (a1)
     			
@@ -135,5 +135,12 @@ DIGDUG_SPRT_SHEET:	.space 18000
 	addi	t2, t2, -1
 	j OUTER
     END_OUTER:
+.end_macro
+
+# Analisa estado atual de Dig Dug e retorna, em a0, o offset correto
+.macro DIGDUG_SPRITE_PICK ()
+
+	
+
 
 .end_macro

@@ -301,36 +301,44 @@ END_DRAW:
 	# Calcula offset e soma ao endereço do display, armazena em t0 - Não alterar t0
 	mv	t0, %topy
 	mv	t1, %topx
+
+	li	t2, 10
+	div	t0, t0, t2
+	div	t1, t1, t2
+	
 	li	t2, 320
 	li	t3, DISPLAY_ADDR
 	mul	t0, t0, t2
-	add	t0, t0, t1
-	add	t0, t0, t3
+	add	t0, t0, t1				# Offset
+	add	t3, t3, t0
 	
 	mv	t1, %height
 	
 	la	t4, BG_HLAYER_BUFFER
 	la	t5, BG_VLAYER_BUFFER
 	la	t6, BG_DLAYER_BUFFER
-
+	add	t4, t4, t0
+	add	t5, t5, t0
+	add	t6, t6, t0
+	
     OUTER_LOOP:
     	beq 	t1, zero, END_OUTER
     	mv	t2, %width
     		INNER_LOOP:
     			beq	t2, zero, END_INNER
     			
-    			sb	zero, (t0)
+    			sb	zero, (t3)
     			
     			lb	s10, (t4)
-    			sb	s10, (t0)
+    			sb	s10, (t3)
     			
     			lb	s10, (t5)
-    			sb	s10, (t0)
+    			sb	s10, (t3)
     			
     			lb	s10, (t6)
-    			sb	s10, (t0)
+    			sb	s10, (t3)
     			
-    			addi	t0, t0, 1
+    			addi	t3, t3, 1
     			addi	t4, t4, 1
     			addi	t5, t5, 1
     			addi	t6, t6, 1
@@ -338,12 +346,12 @@ END_DRAW:
     			addi	t2, t2, -1
     			j INNER_LOOP
     		END_INNER:
-    	addi	t0, t0, 320
+    	addi	t3, t3, 320
     	addi	t4, t4, 320
     	addi	t5, t5, 320
     	addi	t6, t6, 320
     	
-    	sub	t0, t0, %width
+    	sub	t3, t3, %width
     	sub	t4, t4, %width
     	sub	t5, t5, %width
     	sub	t6, t6, %width

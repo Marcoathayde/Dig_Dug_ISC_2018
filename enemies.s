@@ -326,9 +326,9 @@ GAME_POOKA_BUFFER: 	.space 72
 	beq	s11, zero, TEST_CUR_DIR
 	
 	# Descomentar as próximas três linhas faz com que o inimigo fuja se for o último	
-	loadw(	t0, GAME_ENEMY_COUNT)
-	li	t1, 1
-	beq	t0, t1, LAST_ENEMY
+	#loadw(	t0, GAME_ENEMY_COUNT)
+	#li	t1, 1
+	#beq	t0, t1, LAST_ENEMY
 	# Não é o último inimigo, então checamos se está alinhado com Dig Dug
 	loadw(	t0, %enemy_addr)
 	addi	t0, t0, ENEMY_POS_OFFSET
