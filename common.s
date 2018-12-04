@@ -166,6 +166,7 @@ END_DRAW:
 # Similar ao DRAW_IMG, mas para a representação invisível do mapa de jogo.
 # %address: endereço de leitura; %offset: onde começar a ler; %width: largura da imagem; %cropw: largura do segmento; %croph: altura do segmento
 # %posx: coordenada X da tela; %posy: coordenada Y da tela
+# Retorna, em s11, 1, se houver apagado algo, ou 0, caso não
 .macro WRITE_TO_BUFFER (%address, %width, %offset, %cropw, %croph, %posx, %posy, %map_addr)
 	la t0, %address					# Adicionamos ao endereço de início o offset desejado
 	mv t1, %offset
@@ -179,6 +180,7 @@ END_DRAW:
 	mv t1, %map_addr				# A tudo isso, adicionamos o endereço onde começa o buffer de display
 	add t3, t3, t1
 	
+	mv s11, zero
 	mv t2, %croph
 	# t0: endereço da imagem na memória
 	# t1: número de pixels por linha a desenhar
@@ -191,6 +193,13 @@ START_DRAW:
 	DRAW_PIXEL:			
 		beq t1, zero, END_DRAW_PIXEL		# Se o número de pixels na linha a desenhar for zero, saímos do loop interior
 		lb t4, (t0)				# Armazena a cor em t4 temporariamente
+		
+		# Para uso futuro, testamos se, de fato, o mapa foi apagado
+		lb s10, (t3)
+		beq s10, zero, DO_NOTHING
+		li s11, 1
+		DO_NOTHING:	
+		
 		sb t4, (t3)				# Desenhamos o pixel no buffer de display
 		addi t0, t0, 1				# Passa para o próximo pixel
 		addi t3, t3, 1

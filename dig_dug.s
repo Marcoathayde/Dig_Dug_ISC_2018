@@ -5,10 +5,10 @@
 #################################
 .data
 
-DIGDUG_DIRECTION: 	.word 0x00	# 0: cima; 1: baixo; 2: esquerda; 3: direita
-DIGDUG_DIGGING: 	.byte 0x01
-DIGDUG_MOVED:		.byte 0x00
-DIGDUG_CYCLE:		.word 0x00
+DIGDUG_DIRECTION: 	.word 0x02	# 0: cima; 1: baixo; 2: esquerda; 3: direita
+DIGDUG_STATE: 		.word 0x00	# 0: Não cavando; 1: Cavando; 2: Jogando mangueira; 3: Enchendo 
+DIGDUG_MOVED:		.word 0x00
+DIGDUG_CYCLE:		.word 0x01
 
 # Coordenadas dos limites da box.
 DIGDUG_TOP_X: .word 0
@@ -56,6 +56,8 @@ DIGDUG_SPRT_SHEET:	.space 18000
 	li 	a4, 18
 	la 	a5, GAME_MAP
 	WRITE_TO_BUFFER(GAP_DATA, 18, zero, a3, a4, a0, a1, a5)
+	# Retorna booleana DIGDUG_DIGGING em s11
+	sw	s11, DIGDUG_STATE, t0
 	
 	loadw(	t0, DIGDUG_TOP_X)
 	loadw(	t1, DIGDUG_TOP_Y)
@@ -137,10 +139,111 @@ DIGDUG_SPRT_SHEET:	.space 18000
     END_OUTER:
 .end_macro
 
-# Analisa estado atual de Dig Dug e retorna, em a0, o offset correto
+# Analisa estado atual de Dig Dug, escolha sprite correto, e atualiza contador de ciclo de animação
+# Retorna em a0 o offset, em a1 e a2 as dimensões de corte (a1: width)
+# Usa t0, t1, s10, s11, a0, a1, a2
 .macro DIGDUG_SPRITE_PICK ()
 
+
+	loadw(	t0, DIGDUG_STATE)
+	loadw(	s10, DIGDUG_DIRECTION)
+	loadw(	s11, DIGDUG_CYCLE)
 	
+	beq	t0, zero, WALKING
+	li	t1, 1
+	beq	t0, t1, DIGGING
 
-
+    # Alerta: muitas magic constants
+    # Necessário olhar o arquivo de sprite para tirar os valores
+    
+    WALKING:
+    	
+    	# Pegamos a direção e testamos
+  
+    	beq	s10, zero, WALK_UP
+    	li	t0, 1
+    	beq	s10, t0, WALK_DOWN
+    	li	t0, 2
+    	beq	s10, t0, WALK_LEFT
+    	
+    # WALK_RIGHT:
+    	li	t0, 3240
+    	add	a0, zero, t0
+    	j CYCLE
+    	
+    WALK_LEFT:
+    	li	t0, 2592
+    	add	a0, zero, t0
+    	j CYCLE
+    	
+    WALK_UP:
+    	li	t0, 4536
+    	add	a0, zero, t0
+    	j CYCLE
+    	
+    WALK_DOWN:
+    	li	t0, 3888
+    	add	a0, zero, t0
+    	j CYCLE
+    
+    ### CAVANDO ####
+    DIGGING:
+    	
+    	add	a0, zero, zero
+    	# Pegamos a direção e testamos
+  
+    	beq	s10, zero, DIG_UP
+    	li	t0, 1
+    	beq	s10, t0, DIG_DOWN
+    	li	t0, 2
+    	beq	s10, t0, DIG_LEFT
+    	
+    	# DIG_RIGHT:
+    		addi	a0, a0, 648
+    		j CYCLE
+    	
+    	DIG_LEFT:
+    		addi	a0, a0, 0
+    		j CYCLE
+    
+    	DIG_UP:
+    		addi	a0, a0, 1944
+    		j CYCLE
+    
+    	DIG_DOWN:
+    		addi	a0, a0, 1296
+    	  	
+    	
+    	# Como Dig Dug só tem dois sprites por animação, só tem 2 ciclos
+    	# Achamos o offset X multiplicando o ciclo pelo tamanho do sprite
+    	CYCLE: 
+    		# Testamos primeiro se Dig Dug está se movimentando. Se não estiver, não fazemos nada
+    		loadw(	t0, DIGDUG_SPEED_X)
+    		loadw(	t1, DIGDUG_SPEED_Y)
+    	
+    		add	t0, t0, t1
+    		beq	t0, zero, END
+    	
+    		# Para que a animação só seja atualizada a cada 2 frames
+    		mv	t1, s11
+    		li	t2, 2
+    		#div	t1, t1, t2
+    		
+    		li	t0, 18
+    		mul	t0, t0, t1
+    		add	a0, a0, t0
+    		
+    		# Usamos função modulo para retornar o contador de ciclos para 0, se alcançar 4
+    		li	t0, 2
+    		addi	s11, s11, 1
+    		rem	s11, s11, t0
+    		
+    		sw	s11, DIGDUG_CYCLE, t0
+    		
+    		
+    		j END
+    
+    END:
+    	li	a1, 18
+    	li	a2, 18
 .end_macro

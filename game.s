@@ -257,11 +257,13 @@ MOVEMENT_PHASE:
 		li t0, WORLD_UP_EDGE_X
 		blt a0, t0, DIGDUG_TEST_LOWER_X
 		mv a0, t0
+		SET_VALUE_REG(DIGDUG_SPEED_X, zero)
 		j DIGDUG_SET_NEW_X
 	DIGDUG_TEST_LOWER_X:
 		li t0, WORLD_LW_EDGE_X
 		bge a0, t0, DIGDUG_SET_NEW_X
 		mv a0, t0
+		SET_VALUE_REG(DIGDUG_SPEED_X, zero)
 	DIGDUG_SET_NEW_X:
 		SET_VALUE_REG(DIGDUG_TOP_X, a0)
 		# Atualizamos Y
@@ -272,11 +274,13 @@ MOVEMENT_PHASE:
 		li t0, WORLD_UP_EDGE_Y
 		blt a0, t0, DIGDUG_TEST_LOWER_Y
 		mv a0, t0
+		SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
 		j DIGDUG_SET_NEW_Y
 	DIGDUG_TEST_LOWER_Y:
 		li t0, WORLD_LW_EDGE_Y
 		bge a0, t0, DIGDUG_SET_NEW_Y
 		mv a0, t0
+		SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
 	DIGDUG_SET_NEW_Y:
 		SET_VALUE_REG(DIGDUG_TOP_Y, a0)
 	
@@ -341,12 +345,10 @@ RENDER_OBJECTS:
 		div 	a4, a4, t0
 		addi 	a3, a3, 1
 		addi 	a4, a4, 1
-	
-		li 	a0, 0
-		li 	a1, 18
-		li 	a2, 18
-	
-		DRAW_IMG_TR(DIGDUG_SPRT_SHEET, 36, a0, a1, a2, a3, a4)
+		
+		# Retorna a0, a1, a2
+		DIGDUG_SPRITE_PICK()
+		DRAW_IMG(DIGDUG_SPRT_SHEET, 36, a0, a1, a2, a3, a4)
 		
 	# Pookas(s)
 	
