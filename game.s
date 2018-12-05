@@ -3,6 +3,7 @@
 # Mapa de jogo
 GAME_MAP_PATH_PTR:	.word 0x00
 # Background
+BLAYER_PATH_PTR:	.word 0x00
 DLAYER_PATH_PTR: 	.word 0x00
 HLAYER_PATH_PTR: 	.word 0x00
 VLAYER_PATH_PTR: 	.word 0x00
@@ -10,6 +11,7 @@ VLAYER_PATH_PTR: 	.word 0x00
 # Fases
 # Level 00
 LEVEL_0_GMAP: 		.asciz "bin/level_0/00_gmap.bin"
+LEVEL_0_BLAYER:		.asciz "bin/level_0/00_bg_blayer.bin"
 LEVEL_0_DLAYER:		.asciz "bin/level_0/00_bg_dlayer.bin"
 LEVEL_0_HLAYER:		.asciz "bin/level_0/00_bg_hlayer.bin"
 LEVEL_0_VLAYER:		.asciz "bin/level_0/00_bg_vlayer.bin"
@@ -20,6 +22,7 @@ LEVEL_0_VLAYER:		.asciz "bin/level_0/00_bg_vlayer.bin"
 
 # Buffers de gráfico
 BG_DLAYER_BUFFER:       .space 76800
+BG_BLAYER_BUFFER:	.space 76800
 BG_HLAYER_BUFFER:	.space 76800
 BG_VLAYER_BUFFER:	.space 76800
 
@@ -53,6 +56,9 @@ LEVEL_COUNTER:	 	.word 0
 	la	t0, LEVEL_0_VLAYER
 	sw	t0, VLAYER_PATH_PTR, t1
 	
+	la	t0, LEVEL_0_BLAYER
+	sw	t0, BLAYER_PATH_PTR, t1
+	
 	# Resetamos todos os valores
 	
 	# A seção a seguir executa quando há:
@@ -64,6 +70,7 @@ LEVEL_COUNTER:	 	.word 0
 	LOAD_FILE_PTR(DLAYER_PATH_PTR, BG_DLAYER_BUFFER, 76800)
 	LOAD_FILE_PTR(HLAYER_PATH_PTR, BG_HLAYER_BUFFER, 76800)
 	LOAD_FILE_PTR(VLAYER_PATH_PTR, BG_VLAYER_BUFFER, 76800)
+	LOAD_FILE_PTR(BLAYER_PATH_PTR, BG_BLAYER_BUFFER, 76800)
 	# Carrega mapa de jogo
 	LOAD_FILE_PTR(GAME_MAP_PATH_PTR, GAME_MAP, 76800)
 	
@@ -81,12 +88,28 @@ LEVEL_COUNTER:	 	.word 0
 	SET_VALUE_IMM(DIGDUG_BOT_X, 1590)
 	SET_VALUE_IMM(DIGDUG_BOT_Y, 1390)
 	
+	# Pinta a tela de preto para apagar menu
+	li 	t1, 0xFF000000
+	li 	t2, 0xFF012C00
+	li 	t3, 0x00000000
+    FILL_B: 
+	beq 	t1, t2, END_FILL_B
+	sw 	t3, 0(t1)
+	addi 	t1, t1, 4
+	j FILL_B
+    END_FILL_B:
+	
+	
 	# Set Dig Dug initial position, draw him
-	# Draw flower function
 	
 	li a0, 320
 	li a1, 240
 	DRAW_IMG(BG_DLAYER_BUFFER, 320, zero, a0, a1, zero, zero)
+	
+	# Draw flower function
+	li a0, 320
+	li a1, 240
+	DRAW_IMG(BG_BLAYER_BUFFER, 320, zero, a0, a1, zero, zero)
 	
 	# Print start message and redraw
 	

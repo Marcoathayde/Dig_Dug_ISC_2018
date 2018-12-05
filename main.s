@@ -3,6 +3,19 @@
 # TO-DO List
 # - Muita coisa
 
+##############################################################
+#        Universidade de Brasília
+#        Instituto de Ciências Exatas
+#        Departamento de Ciência da Computação
+#        Introdução aos Sistemas Computacionais – 2/2018
+#        Grupo:    Marco Antônio Souza de Athayde
+#	  	   Matheus Aguiar
+#	    	   Murilo Ferreira
+#	           Rafael dos Santos
+#        Turma: A
+#        Descrição: Dig Dug para RISC-V, DIY
+##############################################################
+
 #.include "common.s"
 .include "data.s"
 .include "dig_dug.s"
@@ -20,7 +33,7 @@
 
 .data
 # Imagens de menu
-	TITLE_SCREEN_PATH: 	.asciz "bin/menu/titlescreen_wip.bin"
+	TITLE_SCREEN_PATH: 	.asciz "bin/menu/title_screen.bin"
 	INSTRUCTIONS_PATH:	.asciz "bin/menu/instructions_wip.bin"
 	
 # Váriaveis de navegação do menu

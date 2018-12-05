@@ -333,16 +333,18 @@ END_DRAW:
 	la	t4, BG_HLAYER_BUFFER
 	la	t5, BG_VLAYER_BUFFER
 	la	t6, BG_DLAYER_BUFFER
+	la	s3, BG_BLAYER_BUFFER
 	add	t4, t4, t0
 	add	t5, t5, t0
 	add	t6, t6, t0
+	add	s3, s3, t0
 	
     OUTER_LOOP:
     	beq 	t1, zero, END_OUTER
     	mv	t2, %width
     		INNER_LOOP:
     			beq	t2, zero, END_INNER
-    			
+
     			sb	zero, (t3)
     			
     			lb	s10, (t4)
@@ -354,10 +356,14 @@ END_DRAW:
     			lb	s10, (t6)
     			sb	s10, (t3)
     			
+    			lb	s10, (s3)
+    			sb	s10, (t3)
+    			
     			addi	t3, t3, 1
     			addi	t4, t4, 1
     			addi	t5, t5, 1
     			addi	t6, t6, 1
+    			addi	s3, s3, 1
     			
     			addi	t2, t2, -1
     			j INNER_LOOP
@@ -366,11 +372,13 @@ END_DRAW:
     	addi	t4, t4, 320
     	addi	t5, t5, 320
     	addi	t6, t6, 320
+    	addi	s3, s3, 320
     	
     	sub		t3, t3, %width
     	sub		t4, t4, %width
     	sub		t5, t5, %width
     	sub		t6, t6, %width
+    	sub		s3, s3, %width
     	
     	addi	t1, t1, -1
     	j OUTER_LOOP
