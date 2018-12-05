@@ -36,6 +36,13 @@ GAME_LIVES:	.byte 5
 SPRITE_SHEET_PATH: 	.asciz "bin/digdug_sprtsheet.bin"
 SPRITE_SHEET_BUFFER: 	.space 42504
 
+# Música
+MUSIC_SIZE:		.word 44
+MUSIC_INDEX:	.word 0x00
+MUSIC_WAIT:		.word 0x00
+MUSIC_NOTES: 78,192,79,192,79,192,79,384,79,192,79,192,79,192,79,192,79,192,79,192,79,384,79,192,79,192,79,192,76,384,74,192,76,384,74,192,76,192,74,192,76,768,74,900,75,192,76,192,76,192,76,384,76,192,76,192,76,192,76,192,76,192,76,192,76,384,76,192,76,192,76,192,76,384,74,192,76,384,74,192,76,192,74,192,79,1536
+#MUSIC_NOTES: 78,79,79,79,79,79,79,79,79,79,79,79,79,79,76,74,76,74,76,74,76,74,75,76,76,76,76,76,76,76,76,76,76,76,76,76,76,74,76,74,76,74,79,79
+
 .text
 # Funções
 # Usa um registrador para fazer um pulo sem restrições
@@ -360,12 +367,60 @@ END_DRAW:
     	addi	t5, t5, 320
     	addi	t6, t6, 320
     	
-    	sub	t3, t3, %width
-    	sub	t4, t4, %width
-    	sub	t5, t5, %width
-    	sub	t6, t6, %width
+    	sub		t3, t3, %width
+    	sub		t4, t4, %width
+    	sub		t5, t5, %width
+    	sub		t6, t6, %width
     	
     	addi	t1, t1, -1
     	j OUTER_LOOP
     END_OUTER:
+.end_macro
+
+# Nome temporário
+# Toca música enquanto Dig Dug se move e não há outros eventos de som
+# Usa t0, t1, t2, t3, a0, a1, a2, a3, a7
+.macro SOUND_FUNCT ()
+	loadw(	t0, DIGDUG_SPEED_X)
+	loadw(	t1, DIGDUG_SPEED_Y)
+	add		t0, t0, t1
+	beq		t0, zero, END
+	
+	# Checamos se ainda temos que esperar que a nota anterior termine de tocar
+	
+	loadw(	t0, MUSIC_WAIT)
+	li		t1, TIME_STEP
+	
+	sub		t0, t0, t1
+	sw		t0, MUSIC_WAIT, t1
+	
+	bgt		t0, zero, END
+	
+	
+	PLAY_MUSIC:
+		la		t0, MUSIC_NOTES
+		loadw(	t1, MUSIC_SIZE)
+		loadw(	t2, MUSIC_INDEX)
+		
+		li		t3, 8							# Tamanho de um objeto no vetor (4 bytes de nota + 4 bytes de duração) 
+		mul		t3, t2, t3
+	
+		add		t0, t0, t3
+	
+		lw		a0, (t0)
+		lw		a1, 4(t0)
+		
+		sw		a1, MUSIC_WAIT, t3				# Armazenamos o tempo que temos que esperar antes de tocar a próxima nota
+												# na próxima atualização
+		li		a2, 11
+		li		a3, 40		
+		li		a7, 31
+		ecall
+		
+		# Atualizamos o contador de notas
+		addi	t2, t2, 1
+		rem		t2, t2, t1
+		sw		t2, MUSIC_INDEX, t1
+
+	END:
 .end_macro

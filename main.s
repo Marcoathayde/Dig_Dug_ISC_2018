@@ -1,13 +1,10 @@
 # Lembretes
 # - 
 # TO-DO List
-# - Calcular quanto espaço cada inimigo usa.
-# - Com isso, definir espaço máximo a ser alocado para os inimigos em cada fase.
-# - Atualizar Bot_x e Bot_y (usar Top_x e Top_y como base)
-# - Otimizar algumas funções usando uma booleana para impedir que executem quando não houve movimento
-
+# - Muita coisa
 
 #.include "common.s"
+.include "data.s"
 .include "dig_dug.s"
 .include "enemies.s"
 .include "game.s"
@@ -43,6 +40,7 @@
 	
 	LOAD_FILE(SPRITE_SHEET_PATH, SPRITE_SHEET_BUFFER, 42504)
 	LOAD_FILE(DIGDUG_SPRT_SHEET_PATH, DIGDUG_SPRT_SHEET, 18000)
+	LOAD_FILE(POOKA_SPRITE_PATH, POOKA_SPRITE_BUFFER, 9000)
 	
 	# Imagem de lacuna na representação invisível
 	LOAD_FILE(GAP_DATA_PATH, GAP_DATA, 324)

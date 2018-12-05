@@ -19,15 +19,19 @@
 .eqv ENEMY_POS_OFFSET   24
 
 .data
-# Pooka
+# Variáveis de controle
+ENEMY_DD_COLLIDED:	.word 0
 
+#########
+# Pooka #
+#########
 POOKA_IN: 		.word 1
 
 POOKA_DIRECTION: 	.word ENEMY_DOWN
 POOKA_CYCLE: 		.word 0x00
 
 # Estados possíveis:
-# 0: normal; 1: fantasma; 2, 3, 4: inflado; 5: esmagado
+# 0: normal; 1: fantasma; 2: inflado; 3: jogando fogo; 4: sendo esmagado; 5: explodindo
 POOKA_STATE: 		.word 0x00
 
 POOKA_SPEED_X: 		.word 0
@@ -71,7 +75,7 @@ ENEMY_AVAIL_DIR:	.space 16
 .align 2
 GAME_ENEMY_COUNT:	.word 0
 GAME_POOKA_COUNT:	.word 0 		# Quantidade de pookas remanescentes
-GAME_POOKA_BUFFER: 	.space 72
+GAME_POOKA_BUFFER: 	.space 272		# Deverá ser 4 vezes o tamanho de um Pooka
 
 
 .text
@@ -544,7 +548,126 @@ GAME_POOKA_BUFFER: 	.space 72
     END:
 .end_macro
 
-.macro ENEMY_ACTION (%enemy_addr)
+# Só para Pooka, no momento
+# Usa t0, s9, s10, s11
+.macro ENEMY_SPRITE_PICK (%enemy_addr_ptr)
+
+	# Armazena endereço do inimigo em s9 para o resto da sub-rotina
+	loadw(	s9, %enemy_addr_ptr)
+	
+	# ALERTA; CONSTANTE MÁGICA TROCAR DEPOIS
+	# Representa offset de State
+	lw		t0, 12(s9)
+	# Representa offset de ciclo de animação
+	lw		s10, 8(s9)
+	
+	beq		t0, zero, NORMAL
+	j END
+	
+	NORMAL:
+	
+	
+
+    	
+    # WALK_RIGHT:
+    	li	t0, 3240
+    	add	a0, zero, t0
+    	j CYCLE
+    	
+    	  	
+    	
+    	# Como Dig Dug só tem dois sprites por animação, só tem 2 ciclos
+    	# Achamos o offset X multiplicando o ciclo pelo tamanho do sprite
+    	CYCLE: 
+    		# Testamos primeiro se Dig Dug está se movimentando. Se não estiver, não fazemos nada
+    		loadw(	t0, DIGDUG_SPEED_X)
+    		loadw(	t1, DIGDUG_SPEED_Y)
+    	
+    		add	t0, t0, t1
+    		beq	t0, zero, END
+    	
+    		# Para que a animação só seja atualizada a cada 2 frames
+    		mv	t1, s11
+    		li	t2, 2
+    		#div	t1, t1, t2
+    		
+    		li	t0, 18
+    		mul	t0, t0, t1
+    		add	a0, a0, t0
+    		
+    		# Usamos função modulo para retornar o contador de ciclos para 0, se alcançar 4
+    		li	t0, 2
+    		addi	s11, s11, 1
+    		rem	s11, s11, t0
+    		
+    		sw	s11, DIGDUG_CYCLE, t0
+    		
+    		
+    		j END
+    
+    END:
+    	li	a1, 18
+    	li	a2, 18
+ 
+.end_macro
+
+# Testa colisão entre um inimigo e Dig Dug
+# Retorna, em a0, se houve colisão ou não
+# Usa t0, t1, t2, t3, t4, s7, s8, s9, s10, s11, a0, a1
+.macro ENEMY_DD_COLL (%enemy_addr_ptr)
+	
+	loadw(	s11, %enemy_addr_ptr)
+	addi	t0, s11, ENEMY_POS_OFFSET
+	
+	# Enemy top X
+	lw	t1, (t0)
+	# Enemy top Y
+	lw	t2, 4(t0)
+	# Enemy bottom X
+	lw	t3, 8(t0)
+	# Enemy bottom Y
+	lw	t4, 12(t0)
+	
+	# Ajuste de caixa de colisão
+	# Top
+	addi	t1, t1, 50
+	addi	t2, t2, 50
+	# Bottom
+	addi	t3, t3, -50
+	addi	t3, t3, -50
+	
+	loadw(	s7, DIGDUG_TOP_X)
+	loadw(	s8, DIGDUG_TOP_Y)
+	loadw(	s9, DIGDUG_BOT_X)
+	loadw( s10, DIGDUG_BOT_Y)
+	
+	# Série de comparações para detectar colisão
+	
+	# if ( D_top_x - En_bot_x > 0) No Col
+	sub	a0, s7, t3
+	bge	a0, zero, NO_COL
+	
+	sub	a0, t1, s9
+	bge	a0, zero, NO_COL
+	
+	# Teste de coordenadas Y
+	sub	a0, t2, s10
+	bge	a0, zero, NO_COL
+	
+	sub	a0, s8, t4
+	bge	a0, zero, NO_COL
+	
+	# Collision TRUE
+	li	a0, 1
+	j END
+	
+    NO_COL:
+    	li	a0, 0
+    END:
+    	sw	a0, ENEMY_DD_COLLIDED, t0
+.end_macro
+
+.macro ENEMY_ACTION (%enemy_addr_ptr)
 	# Julgar o que fazer baseado no estado do inimgo.
 	
 	
@@ -552,6 +675,72 @@ GAME_POOKA_BUFFER: 	.space 72
 	# To-do:
 	# - Testar se transforma em fantasma
 	#
-	ENEMY_NORMAL_DIR(%enemy_addr)
-	ENEMY_UPDATE_POSITION(%enemy_addr)
+	ENEMY_NORMAL_DIR(%enemy_addr_ptr)
+	ENEMY_UPDATE_POSITION(%enemy_addr_ptr)
+	ENEMY_DD_COLL(%enemy_addr_ptr)
+.end_macro
+
+# Usa s11
+.macro ENEMY_SPRITE_PICK (%enemy_addr_ptr)
+
+	loadw(	s11, %enemy_addr_ptr)
+	lw	s10, 4(s11)					# Direção
+	lw	 s9, 8(s11)					# Ciclo 
+	
+	mv	a0, zero
+	
+	beq	s11, zero, WALKING
+
+    # Alerta: muitas magic constants
+    # Necessário olhar o arquivo de sprite para tirar os valores
+    
+    WALKING:
+    	
+    	# Pegamos a direção e testamos
+    	li	t0, ENEMY_LEFT
+    	beq	s10, t0, WALK_LEFT
+    	li	t0, ENEMY_RIGHT
+    	beq	s10, t0, WALK_RIGHT
+    	
+    WALK_LEFT:
+    	li	t0, 0
+    	add	a0, zero, t0
+    	j CYCLE	
+    
+    WALK_RIGHT:
+    	li	t0, 648
+    	add	a0, zero, t0
+    	j CYCLE  	
+    	
+
+    	CYCLE: 
+    	
+    		# Pooka only
+    		mv	t0, s9
+    		li	t1, 2
+    		bge	t0, t1, CYCLE_2
+    		
+    		# CYCLE_1
+    			li	t0, 0
+    			add	a0, a0, t0
+    			j CYCLE_INCREASE
+    			
+    		CYCLE_2:
+    			li	t0, 18
+    			add	a0, a0, t0
+ 
+    		CYCLE_INCREASE:
+    		# Usamos função modulo para retornar o contador de ciclos para 0, se alcançar 4
+    		li	t0, 16
+    		addi	s9, s9, 1
+    		rem	s9, s9, t0
+    		
+    		sw	s9, 8(s11)
+    		
+    		j END
+    
+    END:
+    	# Largura e altura do sprite
+    	li	a1, 18
+    	li	a2, 18
 .end_macro

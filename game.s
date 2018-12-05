@@ -91,9 +91,6 @@ LEVEL_COUNTER:	 	.word 0
 	# Print start message and redraw
 	
 	
-
-	li s6, 1 # Bool para MOVEMENT TEST - Remover depois
-	
 MAIN: 
 	lw t0, INPUT_RDY_ADDR		# Vemos se há caractere a ler
 	beq t0, zero, GET_CURRENT_TIME  
@@ -105,48 +102,6 @@ MAIN:
 GET_CURRENT_TIME:
 	GET_TIME(s0) 			# Pegamos o tempo no começo do loop
 
-
-MOVEMENT_TEST_SETUP: beq s6, zero, MOVEMENT_TEST_SETUP_DONE
-	# Posição inicial
-	# Escala da representação virtual de espaço para pixels é 10:1
-	
-	lw t0, DIGDUG_TOP_X
-	li t6, 10
-	div t0, t0, t6
-	
-	lw t1, DIGDUG_TOP_Y
-	div t1, t1, t6
-	
-	li t3, 320
-	mul t1, t1, t3
-	add t0, t1, t0
-	la t5, BG_DLAYER_BUFFER
-	add t0, t0, t5
-	la t2, DIGDUG_BG_DATA
-	li t3, 20
-	li t5, 20
-	
-	SAVE_BG_DATA_FIRST_OUTER:
-		beq t5, zero, SAVE_BG_DATA_FIRST_DONE
-		li t3, 20
-		SAVE_BG_DATA_FIRST_INNER:
-			beq t3, zero, SAVE_BG_DATA_FIRST_INNER_DONE
-			# 4 por vez
-			lb t4, (t0)
-			sb t4, (t2)
-			addi t0, t0, 1
-			addi t2, t2, 1
-	
-			addi t3, t3, -1
-			j SAVE_BG_DATA_FIRST_INNER
-		SAVE_BG_DATA_FIRST_INNER_DONE:
-		addi t0, t0, 300
-		addi t5, t5, -1
-		j SAVE_BG_DATA_FIRST_OUTER
-	SAVE_BG_DATA_FIRST_DONE:
-	
-	li s6, 0
-MOVEMENT_TEST_SETUP_DONE:
 
 
 MOVEMENT_PHASE:
@@ -265,7 +220,11 @@ MOVEMENT_PHASE:
 		mv a0, t0
 		SET_VALUE_REG(DIGDUG_SPEED_X, zero)
 	DIGDUG_SET_NEW_X:
+		mv s11,	a0
 		SET_VALUE_REG(DIGDUG_TOP_X, a0)
+		addi s11, s11, 190
+		SET_VALUE_REG(DIGDUG_BOT_X, s11)
+		
 		# Atualizamos Y
 		lw a0, DIGDUG_TOP_Y
 		lw t0, DIGDUG_SPEED_Y
@@ -282,7 +241,10 @@ MOVEMENT_PHASE:
 		mv a0, t0
 		SET_VALUE_REG(DIGDUG_SPEED_Y, zero)
 	DIGDUG_SET_NEW_Y:
+		mv s11, a0
 		SET_VALUE_REG(DIGDUG_TOP_Y, a0)
+		addi s11, s11, 190
+		SET_VALUE_REG(DIGDUG_BOT_Y, s11)
 	
 	DIGDUG_CALC_NEXT_POS_END:
 	
@@ -361,8 +323,8 @@ RENDER_OBJECTS:
 		
 	# TO-DO - Fazer quatro checks em vez de um só com um loop
 	
-		la t0, GAME_POOKA_BUFFER
-		addi t0, t0, ENEMY_POS_OFFSET
+		loadw( 	t0, CURRENT_ENEMY_ADDR)
+		addi 	t0, t0, ENEMY_POS_OFFSET
 		
 		# Redesenhamos o BG primeiro
 		lw	a0, 16(t0)
@@ -371,26 +333,36 @@ RENDER_OBJECTS:
 		li	a3, 20
 		REDRAW_BG(a0, a1, a2, a3)
 		
-		la t0, GAME_POOKA_BUFFER
-		addi t0, t0, ENEMY_POS_OFFSET
+		loadw( 	t0, CURRENT_ENEMY_ADDR)
+		addi 	t0, t0, ENEMY_POS_OFFSET
 		
-		lw a0, (t0)
-		lw a1, 4(t0)
-		li t1, 10
-		div a0, a0, t1
-		div a1, a1, t1
-		addi a0, a0, 5
-		addi a1, a1, 5
+		lw 	a3,  (t0)
+		lw 	a4, 4(t0)
 		
-		li a2, 10937
-		li a3, 12
-		li a4, 12
+		li 	t1, 10
+		div 	a3, a3, t1
+		div 	a4, a4, t1
+		addi 	a3, a3, 1
+		addi 	a4, a4, 1
 		
-		DRAW_IMG(SPRITE_SHEET_BUFFER, 154, a2, a3, a4, a0, a1)
+		ENEMY_SPRITE_PICK(CURRENT_ENEMY_ADDR)
+		DRAW_IMG(POOKA_SPRITE_BUFFER, 36, a0, a1, a2, a3, a4)
 		
 		
 	DRAW_POOKA_END:
 	
+SOUND_PHASE:
+	SOUND_FUNCT()
+
+
+# Mudar para uma macro WIP
+GAME_OVER_TEST:
+	loadw(	t0, ENEMY_DD_COLLIDED)
+	beq	t0, zero, WAIT
+	
+	li	a0, 8888
+	li	a7, 1
+	ecall
 	
 WAIT:
 	# Calcula quanto tempo esperar até a próxima atualização, printa esse tempo

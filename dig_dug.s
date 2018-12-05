@@ -1,5 +1,7 @@
 .eqv	TRANSP		0x0C7
 
+.eqv	PUMP_TRVL_SPEED	50		# Velocidade de deslocamento da mangueira
+.eqv	PUMP_RATE	1		# Velocidade de enchimento da mangueira
 #################################
 # Dados do Dig Dug (personagem) #
 #################################
@@ -26,7 +28,6 @@ DIGDUG_BOT_X_P: .word 0
 DIGDUG_BOT_Y_P: .word 0
 
 # Cores de fundo da posição atual do personagem, para redesenho
-DIGDUG_BG_DATA: .space 400
 
 #
 DIGDUG_LF_DIG: .word 0
@@ -36,6 +37,17 @@ DIGDUG_DW_DIG: .word 0
 
 DIGDUG_SPRT_SHEET_PATH: .asciz "bin/digdug_sprites.bin"
 DIGDUG_SPRT_SHEET:	.space 18000
+
+
+# Mangueira
+PUMP_ON:	.word 0
+PUMP_ACTIVE:	.word 0
+PUMP_CYCLE:	.word 0
+PUMP_X:		.word 0
+PUMP_Y:		.word 0
+PUMP_DIRECTION:	.word 0
+PUMP_ENEMY_PTR: .word 0				# Endereço do monstro ao qual a mangueira está conectada
+
 .text
 
 # Apaga parte do background na posição de Dig Dug
@@ -139,11 +151,151 @@ DIGDUG_SPRT_SHEET:	.space 18000
     END_OUTER:
 .end_macro
 
+# Somente cria a mangueira
+.macro DIGDUG_SPAWN_PUMP ()
+
+	# Paramos Dig Dug e mudamos seu estado
+	SET_VALUE_IMM(DIGDUG_STATE, 2)
+	SET_VALUE_IMM(DIGDUG_SPEED_X, 0)
+	SET_VALUE_IMM(DIGDUG_SPEED_Y, 0)
+	
+	# Criamos a mangueira dependendo da direção de Dig Dug
+	SET_VALUE_IMM(PUMP_ON, 1)
+	
+	loadw(	s5, DIGDUG_TOP_X)
+	loadw(	s6, DIGDUG_TOP_Y)
+	
+	loadw(	t0, DIGDUG_DIRECTION)
+	sw	t0, PUMP_DIRECTION, t1
+	
+	beq	t0, zero, PUMP_UP
+	li	t1, 1
+	beq	t0, t1, PUMP_DOWN
+	li	t1, 2
+	beq	t0, t1, PUMP_LEFT
+	
+    # PUMP_RIGHT:
+    	addi	t0, s5, 30
+    	sw	t0, PUMP_X, t1
+    	
+    	addi	t0, s6, 10
+    	sw	t0, PUMP_Y, t1
+    	
+    	li	t0, 3
+    	sw	t0, PUMP_DIRECTION, t1
+    	
+    	j END
+    	
+    PUMP_LEFT:
+    	addi	t0, s5, -10
+    	sw	t0, PUMP_X, t1
+    	
+    	addi	t0, s6, 10
+    	sw	t0, PUMP_Y, t1
+    	
+    	li	t0, 2
+    	sw	t0, PUMP_DIRECTION, t1
+    	
+    	j END
+    	
+    PUMP_UP:
+    	addi	t0, s5, 10
+    	sw	t0, PUMP_X, t1
+    	
+    	addi	t0, s6, -10
+    	sw	t0, PUMP_Y, t1
+    	
+    	li	t0, 0
+    	sw	t0, PUMP_DIRECTION, t1
+    	
+    	j END
+    	
+    PUMP_DOWN:
+    	addi	t0, s5, 10
+    	sw	t0, PUMP_X, t1
+    	
+    	addi	t0, s6, 30
+    	sw	t0, PUMP_Y, t1
+    	
+    	li	t0, 1
+    	sw	t0, PUMP_DIRECTION, t1
+
+    END:
+    	# Checar se PumpX e PumpY são coordernadas válidas
+    	# Caso não, desfazer tudo
+    
+    	li	t0, 1
+    	sw	t0, PUMP_ACTIVE, t1
+    	
+    	sw	zero, PUMP_ENEMY_PTR, t1
+
+.end_macro
+
+# Atualiza posição da mangueira, testa colisão com inimigos, desaparece
+.macro PUMP_ACTION ()
+	
+	# Testamos se a mangueira está presente
+	loadw(	t0, PUMP_ON)
+	beq	t0, zero, END
+
+	# Testamos se a mangueira está fixa a um monstro
+
+	loadw(	t0, PUMP_ENEMY_PTR)
+	beq	t0, zero, PUMPING
+
+	# Testar colisão com monstros
+	# Pooka
+	
+	la	t0, GAME_POOKA_BUFFER
+	
+	li	t1, 4
+	# Testamos se há Pookas no vetor
+    POOKA_TEST:
+		beq	t1, zero, END_POOKA
+		
+		# Carrega POOKA_IN
+		lw	t2, (t0)
+		beq	t2, zero, POOKA_NEXT
+		
+		# Testamos colisão com o Pooka
+		#############################
+		
+		
+
+	POOKA_NEXT:
+		addi	t0, t0, POOKA_SIZE
+		addi	t1, t1, -1
+		j POOKA_TEST
+    END_POOKA:
+
+
+    # Mangueira está conectada a um monstro
+    PUMPING:
+	loadw(	t0, PUMP_ENEMY_PTR)
+	lw	t1, (t0)
+	# Testamos se o inimigo ainda está presente
+	# Lembrando os estados de inimigos => 0, normal - 1, fantasma - 2, inflado - 3, fogo - 4 e acima, morrendo
+	li	t2, 4
+	bge	t1, t2, DESPAWN
+	
+	
+	
+	
+	
+
+    DESPAWN:
+
+
+    END:
+.end_macro
+
+.macro PUMP_PICK_SPRITE ()
+.end_macro
+
 # Analisa estado atual de Dig Dug, escolha sprite correto, e atualiza contador de ciclo de animação
 # Retorna em a0 o offset, em a1 e a2 as dimensões de corte (a1: width)
 # Usa t0, t1, s10, s11, a0, a1, a2
 .macro DIGDUG_SPRITE_PICK ()
-
 
 	loadw(	t0, DIGDUG_STATE)
 	loadw(	s10, DIGDUG_DIRECTION)
@@ -226,14 +378,14 @@ DIGDUG_SPRT_SHEET:	.space 18000
     	
     		# Para que a animação só seja atualizada a cada 2 frames
     		mv	t1, s11
-    		li	t2, 2
+    		#li	t2, 2
     		#div	t1, t1, t2
     		
     		li	t0, 18
     		mul	t0, t0, t1
     		add	a0, a0, t0
     		
-    		# Usamos função modulo para retornar o contador de ciclos para 0, se alcançar 4
+    		# Usamos função modulo para retornar o contador de ciclos para 0, se alcançar 2
     		li	t0, 2
     		addi	s11, s11, 1
     		rem	s11, s11, t0
@@ -244,6 +396,7 @@ DIGDUG_SPRT_SHEET:	.space 18000
     		j END
     
     END:
+    	# Largura e altura do sprite
     	li	a1, 18
     	li	a2, 18
 .end_macro
